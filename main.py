@@ -28,17 +28,24 @@ app.add_middleware(
 def root():
     return {"message": "Hello World"}
 
-@app.get("/get_tasks")
-def get_tasks():
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM todo")
-    records = cursor.fetchall()
-    return records
-
 @app.get("/get_games")
 def get_games():
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM SteamDB")
+    cursor.execute("SELECT * FROM games")
+    records = cursor.fetchall()
+    return records
+
+@app.get("/get_tags")
+def get_tags():
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM tags")
+    records = cursor.fetchall()
+    return records
+
+@app.get("/get_reviews")
+def get_reviews():
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM reviews")
     records = cursor.fetchall()
     return records
 
