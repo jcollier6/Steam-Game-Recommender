@@ -73,12 +73,12 @@ def get_users():
 #     conn.commit()
 #     return "Added Successfully"
 
-@app.post("/delete_task")
-def delete_task(id: str = Form(...)):
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM todo WHERE id=%s", (id,))
-    conn.commit()
-    return "Deleted Successfully"
+# @app.post("/delete_task")
+# def delete_task(id: str = Form(...)):
+#     cursor = conn.cursor()
+#     cursor.execute("DELETE FROM todo WHERE id=%s", (id,))
+#     conn.commit()
+#     return "Deleted Successfully"
 
 
 
