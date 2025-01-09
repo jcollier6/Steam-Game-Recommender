@@ -1,9 +1,20 @@
 <body style="background-color:121212;"></body>
 <div style="margin:100px">
-<h2 style="background-color: #3700B3; text-align: center;">Placeholder Recommended Tags</h2>
+<h2 style="background-color: #3700B3; text-align: center;">Recommended Games for an example user</h2>
 
-<p *ngFor="let tag of recommendedTags">
-    &diams;{{tag.name}}
-</p>
-
+<div>
+  @if ( gameListExist ) {
+    <ul>
+      <li>
+        @for ( game of games; track game ) {
+        <strong>{{ game.name }}</strong> (App ID: {{ game.app_id }}) - Score: {{ game.overlap_score }}
+      }
+      </li>
+    </ul>
+  }
+  @else {
+    <p>No recommended games found.</p>
+  }
 </div>
+
+
