@@ -12,12 +12,10 @@ from fastapi.responses import JSONResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Application startup")
     get_API_key()
     prepare_user_info()
     calculate_recommended_games()
     yield
-    print("Application shutdown")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -77,6 +75,14 @@ def get_recommended_games():
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+@app.get("/recently_played")
+def get_recently_played():
+    try:
+        data = df_user_owns[df_user_owns["playtime_2weeks"]>0].to_dict(orient="records")
+        return JSONResponse(content=data)  
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
 
 ### recommendation calculation
 
@@ -84,8 +90,14 @@ user_tag_profile = dict()
 candidate_app_ids = set()
 app_id_to_tags = dict()
 recommended_games = pd.DataFrame()
+df_user_owns = pd.DataFrame()
 API_KEY = ""
 
+
+# prepare cleaned_games information to be merged with other game subsets
+df_metadata = pd.read_csv("cleaned_games.csv", escapechar='\\') 
+df_metadata["app_id"] = df_metadata["app_id"].astype(str)
+df_metadata["name"] = df_metadata["name"].astype(str)
 
 def get_API_key():
     try:
@@ -119,9 +131,8 @@ def prepare_user_info():
         for game in owned_games
     ]
 
+    global df_user_owns
     df_user_owns = pd.DataFrame(user_library_data)
-
-    print(df_user_owns[df_user_owns["playtime_2weeks"]>0])
 
     steam_tags_csv = "tags.csv"     
     df_steam_tags = pd.read_csv(steam_tags_csv)
@@ -148,6 +159,9 @@ def prepare_user_info():
     df_user_owns["weighted_playtime"] = (
         df_user_owns["normalized_playtime"] + 15 * (df_user_owns["playtime_2weeks"] / playtime_75th)
     )
+
+    # add additional game information to the owned games
+    df_user_owns = df_user_owns.merge(df_metadata, on="app_id", how="left")
 
     # collect all tags from the user's owned games and weight by weighted_playtime
     user_tag_counts = Counter()
@@ -177,14 +191,8 @@ def calculate_recommended_games():
     df_scores.sort_values("overlap_score", ascending=False, inplace=True)
     df_scores.reset_index(drop=True, inplace=True)
 
-
-    # display game name, id, and overlap score
-    df_metadata = pd.read_csv("cleaned_games.csv", escapechar='\\') 
-    df_metadata["app_id"] = df_metadata["app_id"].astype(str)
-    df_metadata["name"] = df_metadata["name"].astype(str)
+    # add additional game information to the recommended games
     global recommended_games
     recommended_games = df_scores.head(10).merge(df_metadata, on="app_id", how="left")
-    print(recommended_games[["app_id", "name", "overlap_score"]])
-
 
 

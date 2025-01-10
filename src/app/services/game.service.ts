@@ -2,10 +2,17 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-export interface Game {
+export interface Recommended_Game {
   app_id: string;
   name: string;
   overlap_score: number;
+}
+
+export interface Recent_Game {
+  app_id: string;
+  name: string;
+  playtime_forever: number;
+  playtime_2weeks: number;
 }
 
 @Injectable({
@@ -16,8 +23,11 @@ export class GameService {
 
   constructor(private httpClient: HttpClient) {}
 
-  getRecommendedGames(): Observable<Game[]> {
-    console.log("getRecommenedGames");
-    return this.httpClient.get<Game[]>(`${this.apiUrl}/recommended_games`);
+  getRecommendedGames(): Observable<Recommended_Game[]> {
+    return this.httpClient.get<Recommended_Game[]>(`${this.apiUrl}/recommended_games`);
+  }
+
+  getRecentlyPlayed(): Observable<Recent_Game[]> {
+    return this.httpClient.get<Recent_Game[]>(`${this.apiUrl}/recently_played`);
   }
 }

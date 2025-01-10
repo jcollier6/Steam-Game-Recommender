@@ -4,6 +4,7 @@
     background-repeat: no-repeat;
     background-color: #444444;
     text-align: center;
+    white-space: nowrap;
     color: lightgray;
     padding: 0.5rem;
     font-size: x-large;

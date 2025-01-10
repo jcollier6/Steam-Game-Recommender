@@ -2,11 +2,30 @@
 
 <app-hero-banner></app-hero-banner>
 
-<div>
-  @if ( gameListExist ) {
-    <ul style="color: lightgray;">
-        @for ( game of games; track game ) {
-          <li><strong>{{ game.name }}</strong> (App ID: {{ game.app_id }}) - Score: {{ game.overlap_score }}</li>
+
+<div style="display: flex; flex-direction: column; justify-self: center; font-size: x-large; color: lightgray;">
+  @if ( recentGameListExist ) {
+    <h1>Games Played in the Last Two Weeks</h1>
+    <ul>
+        @for ( game of recentGames; track game ) {
+          <li><strong>{{game.name}}</strong></li>
+          All Time Minutes: {{ game.playtime_forever }} <br>
+          Recent Minutes: {{ game.playtime_2weeks }}
+      }
+    </ul>
+  }
+  @else {
+    <p>No games played in the last two weeks found.</p>
+  }
+</div>
+
+
+<div style="display: flex; flex-direction: column; justify-self: center; font-size: x-large; color: lightgray;">
+  @if ( recommendedGameListExist ) {
+    <h1>Top 10 Recommended Games</h1>
+    <ul>
+        @for ( game of recommendedGames; track game ) {
+          <li><strong>{{ game.name }}</strong></li>
       }
     </ul>
   }
@@ -14,5 +33,7 @@
     <p>No recommended games found.</p>
   }
 </div>
+
+
 
 
