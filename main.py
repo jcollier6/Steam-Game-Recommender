@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 import pandas as pd
 from collections import Counter
-import re
+from fastapi.responses import JSONResponse
 
 
 
@@ -32,7 +32,7 @@ conn = mysql.connector.connect(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200/"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -71,8 +71,11 @@ def get_users():
 
 @app.get("/recommended_games")
 def get_recommended_games():
-    print("test: ", recommended_games[["app_id", "name", "overlap_score"]])  
-    return recommended_games[["app_id", "name", "overlap_score"]].to_dict(orient="records")
+    try:
+        data = recommended_games[["app_id", "name", "overlap_score"]].to_dict(orient="records")
+        return JSONResponse(content=data)  
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 ### recommendation calculation
@@ -94,7 +97,7 @@ def get_API_key():
 
 def prepare_user_info():
     API_URL = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"  
-    STEAM_ID = "76561198293567287"  # variable for user id
+    STEAM_ID = "76561198208956405"  # variable for user id
 
     params = {
         "key": API_KEY,

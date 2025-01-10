@@ -14,9 +14,10 @@ export interface Game {
 export class GameService {
   private apiUrl = 'http://localhost:8000';
 
-  constructor(private http: HttpClient) {}
+  constructor(private httpClient: HttpClient) {}
 
   getRecommendedGames(): Observable<Game[]> {
-    return this.http.get<Game[]>(`${this.apiUrl}/recommended_games`);
+    console.log("getRecommenedGames");
+    return this.httpClient.get<Game[]>(`${this.apiUrl}/recommended_games`);
   }
 }

@@ -5,11 +5,9 @@
 <div>
   @if ( gameListExist ) {
     <ul>
-      <li>
         @for ( game of games; track game ) {
-        <strong>{{ game.name }}</strong> (App ID: {{ game.app_id }}) - Score: {{ game.overlap_score }}
+          <li><strong>{{ game.name }}</strong> (App ID: {{ game.app_id }}) - Score: {{ game.overlap_score }}</li>
       }
-      </li>
     </ul>
   }
   @else {
