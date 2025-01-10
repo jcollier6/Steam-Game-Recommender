@@ -1,10 +1,10 @@
-<body style="background-color:121212;"></body>
-<div style="margin:100px">
-<h2 style="background-color: #3700B3; text-align: center;">Recommended Games for an example user</h2>
+<body style="background-color: #222222; margin: 0;"></body>
+
+<app-hero-banner></app-hero-banner>
 
 <div>
   @if ( gameListExist ) {
-    <ul>
+    <ul style="color: lightgray;">
         @for ( game of games; track game ) {
           <li><strong>{{ game.name }}</strong> (App ID: {{ game.app_id }}) - Score: {{ game.overlap_score }}</li>
       }

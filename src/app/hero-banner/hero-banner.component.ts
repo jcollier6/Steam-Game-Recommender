@@ -1,18 +1,15 @@
 import { Component, OnInit } from '@angular/core';
-import { GameService, Game } from './services/game.service';
+import { GameService, Game } from './../services/game.service';
 import { HttpClientModule } from '@angular/common/http';
-import { HeroBannerComponent } from './hero-banner/hero-banner.component';
-
 
 @Component({
-  selector: 'app-root',
+  selector: 'app-hero-banner',
   standalone: true,
-  templateUrl: './app.component.html',
-  imports: [ HttpClientModule, HeroBannerComponent],
-  providers: [ HttpClientModule, GameService ],
-  styleUrls: ['./app.component.css']
+  imports: [],
+  templateUrl: './hero-banner.component.html',
+  styleUrl: './hero-banner.component.css'
 })
-export class AppComponent implements OnInit {
+export class HeroBannerComponent {
   games: Game[] = [];
   gameListExist = false;
 
@@ -28,4 +25,3 @@ export class AppComponent implements OnInit {
     });
   }
 }
-

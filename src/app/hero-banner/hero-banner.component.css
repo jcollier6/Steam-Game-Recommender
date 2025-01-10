@@ -1,0 +1,28 @@
+.hero-banner {
+    background-image: url('/assets/logo.png');
+    background-size:contain;
+    background-repeat: no-repeat;
+    background-color: #444444;
+    text-align: center;
+    color: lightgray;
+    padding: 0.5rem;
+    font-size: x-large;
+}
+
+.header-button {
+    background-color: #656565;
+    color: lightgray; 
+    border: none; 
+    cursor: pointer; 
+    float: right;
+    font-size: large;
+    padding: 0px 0px;
+    width: 5em;
+    height: 3rem;
+    margin-right: 2rem;
+}
+
+.header-button:hover {
+    background-color: #555555; 
+}
+  
