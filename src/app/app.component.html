@@ -1,39 +1,41 @@
-<body style="background-color: #222222; margin: 0;"></body>
+<body style="background-color: #222222; margin: 0; padding-top: 8vh;">
 
-<app-hero-banner></app-hero-banner>
-
-
-<div style="display: flex; flex-direction: column; justify-self: center; font-size: x-large; color: lightgray;">
-  @if ( recentGameListExist ) {
-    <h1>Games Played in the Last Two Weeks</h1>
-    <ul>
-        @for ( game of recentGames; track game ) {
-          <li><strong>{{game.name}}</strong></li>
-          All Time Minutes: {{ game.playtime_forever }} <br>
-          Recent Minutes: {{ game.playtime_2weeks }}
-      }
-    </ul>
-  }
-  @else {
-    <p>No games played in the last two weeks found.</p>
-  }
-</div>
+  <header>
+    <app-hero-banner></app-hero-banner>
+  </header>
 
 
-<div style="display: flex; flex-direction: column; justify-self: center; font-size: x-large; color: lightgray;">
-  @if ( recommendedGameListExist ) {
-    <h1>Top 10 Recommended Games</h1>
-    <ul>
-        @for ( game of recommendedGames; track game ) {
-          <li><strong>{{ game.name }}</strong></li>
-      }
-    </ul>
-  }
-  @else {
-    <p>No recommended games found.</p>
-  }
-</div>
+  <div style="display: flex; flex-direction: column; justify-self: center; font-size: x-large; color: lightgray;">
+    @if ( recentGameListExist ) {
+      <h1>Games Played in the Last Two Weeks</h1>
+      <ul>
+          @for ( game of recentGames; track game ) {
+            <li><strong>{{game.name}}</strong></li>
+            All Time Minutes: {{ game.playtime_forever }} <br>
+            Recent Minutes: {{ game.playtime_2weeks }}
+        }
+      </ul>
+    }
+    @else {
+      <p>No games played in the last two weeks found.</p>
+    }
+  </div>
 
 
+  <div style="display: flex; flex-direction: column; justify-self: center; font-size: x-large; color: lightgray;">
+    @if ( recommendedGameListExist ) {
+      <h1>Top 10 Recommended Games</h1>
+      <ul>
+          @for ( game of recommendedGames; track game ) {
+            <li><strong>{{ game.name }}</strong></li>
+        }
+      </ul>
+    }
+    @else {
+      <p>No recommended games found.</p>
+    }
+  </div>
 
+
+</body>
 

@@ -1,13 +1,41 @@
 .hero-banner {
+    position: fixed;
+    width: 100%;
+    top: 0;
+    left: 0;
+    z-index: 100;
     background-image: url('/assets/logo.png');
-    background-size:contain;
+    background-size: contain;
     background-repeat: no-repeat;
     background-color: #444444;
-    text-align: center;
-    white-space: nowrap;
     color: lightgray;
-    padding: 0.5rem;
-    font-size: x-large;
+    font-size: clamp(1vw, 3vh, 40vw);
+    height: clamp(2vw, 8vh, 8vh);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.header {
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    padding-left: 22vw;
+    padding-right: 6vw;
+}
+
+.header-button-area {
+    display: flex;
+    gap: 0.5vw;
+    align-items: center;
+    flex-shrink: 1;
+    justify-content: flex-end;
+    max-width: clamp(10vw, 10vw, 20vw);
 }
 
 .header-button {
@@ -15,15 +43,17 @@
     color: lightgray; 
     border: none; 
     cursor: pointer; 
-    float: right;
-    font-size: large;
-    padding: 0px 0px;
-    width: 5em;
-    height: 3rem;
-    margin-right: 2rem;
+    margin-right: 1vw;
+    flex: 1;
+    height: clamp(2vw, 4vh, 4vh);
+    font-size: clamp(1vw, 2vh, 2vw);;
+    flex-shrink: 1;
+    width: 10vw;
 }
+
 
 .header-button:hover {
     background-color: #555555; 
 }
+
   

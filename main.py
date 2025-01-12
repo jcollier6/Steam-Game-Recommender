@@ -109,7 +109,7 @@ def get_API_key():
 
 def prepare_user_info():
     API_URL = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"  
-    STEAM_ID = "76561198208956405"  # variable for user id
+    STEAM_ID = "76561198199410747"  # variable for user id
 
     params = {
         "key": API_KEY,
