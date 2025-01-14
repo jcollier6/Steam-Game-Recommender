@@ -141,6 +141,9 @@ def prepare_user_info():
     df_user_owns["app_id"] = df_user_owns["app_id"].astype(str)
     df_steam_tags["app_id"] = df_steam_tags["app_id"].astype(str)
 
+    # Filter df_user_owns to remove games not in cleaned_games.csv
+    df_user_owns = df_user_owns[df_user_owns["app_id"].isin(df_metadata["app_id"])]
+
     df_app_tags = (
         df_steam_tags
         .groupby('app_id')['tag']
