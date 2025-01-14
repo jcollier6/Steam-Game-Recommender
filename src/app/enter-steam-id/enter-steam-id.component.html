@@ -9,7 +9,18 @@
             placeholder="Enter your Steam ID"
             required
         />
-        <button type="submit" [disabled]="!steamIdForm.valid">Submit</button>
+        <button
+            type="submit"
+            [disabled]="loading || !steamIdForm.valid"
+            [ngClass]="{ 'loading': loading }"
+        >
+            <span *ngIf="!loading">Submit</span>
+            <span *ngIf="loading">Loading...</span>
+        </button>
     </form>
 </div>
-  
+
+
+<div *ngIf="loading" class="loading-overlay">
+    <div class="spinner"></div>
+</div> 
