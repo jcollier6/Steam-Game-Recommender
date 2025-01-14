@@ -13,12 +13,9 @@
     height: clamp(2vw, 8vh, 8vh);
     display: flex;
     align-items: center;
-    justify-content: space-between;
 }
 
 .header {
-    margin: 0;
-    padding: 0;
     flex: 1;
     justify-content: center;
     white-space: nowrap;
@@ -39,14 +36,10 @@
 }
 
 .header-button {
-    background-color: #656565;
-    color: lightgray; 
-    border: none; 
-    cursor: pointer; 
     margin-right: 1vw;
     flex: 1;
     height: clamp(2vw, 4vh, 4vh);
-    font-size: clamp(1vw, 2vh, 2vw);;
+    font-size: clamp(0.5vw, 1.6vh, 1.6vw);;
     flex-shrink: 1;
     width: 10vw;
 }

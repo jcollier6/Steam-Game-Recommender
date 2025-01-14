@@ -1,0 +1,35 @@
+/* Make the container take up the full page */
+.steam-id-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100vw; 
+    height: 80vh;
+    background-color: #222222; 
+    color: lightgray; 
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-size: clamp(1vw, 3vh, 20vw);
+}
+
+input {
+    padding: clamp(1vw, 1vh, 5vw);
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    margin-right: 1vw;
+    font-size: clamp(1vw, 3vh, 20vw);
+}
+
+button {
+    padding: clamp(1vw, 1vh, 5vw);
+    font-size: clamp(1vw, 3vh, 20vw);
+    overflow: hidden;
+}
+
+button:disabled {
+    background-color: #656565;
+    cursor: not-allowed;
+}
+  

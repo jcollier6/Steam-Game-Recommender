@@ -1,0 +1,30 @@
+<div class="list" style="margin-top: 10vh;">
+    @if ( recentGameListExist ) {
+        <h1>Games Played in the Last Two Weeks</h1>
+        <ul>
+            @for ( game of recentGames; track game ) {
+            <li><strong>{{game.name}}</strong></li>
+            All Time Minutes: {{ game.playtime_forever }} <br>
+            Recent Minutes: {{ game.playtime_2weeks }}
+        }
+        </ul>
+    }
+    @else {
+        <p>No games played in the last two weeks found.</p>
+    }
+</div>
+
+
+    <div class="list">
+    @if ( recommendedGameListExist ) {
+        <h1>Top Recommended Games</h1>
+        <ol>
+        @for ( game of recommendedGames; track game ) {
+            <li><strong>{{ game.name }}</strong></li>
+        }
+        </ol>
+    }
+    @else {
+        <p>No recommended games found.</p>
+    }
+</div>

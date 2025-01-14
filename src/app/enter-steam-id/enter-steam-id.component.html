@@ -1,0 +1,15 @@
+<div class="steam-id-container">
+    <h1>Enter Your Steam ID</h1>
+    <form (ngSubmit)="onSubmit()" #steamIdForm="ngForm">
+        <input
+            type="text"
+            id="steamId"
+            name="steamId"
+            [(ngModel)]="steamId"
+            placeholder="Enter your Steam ID"
+            required
+        />
+        <button type="submit" [disabled]="!steamIdForm.valid">Submit</button>
+    </form>
+</div>
+  

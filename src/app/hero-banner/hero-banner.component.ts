@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 
 
 @Component({
@@ -9,5 +10,14 @@ import { Component } from '@angular/core';
   styleUrl: './hero-banner.component.css'
 })
 export class HeroBannerComponent {
-  
+
+  constructor(private router: Router) {}
+
+  goToHome() {
+    this.router.navigate(['/home-page']);
+  }
+
+  signOut() {
+    this.router.navigate(['/enter-steam-id']);
+  }
 }
