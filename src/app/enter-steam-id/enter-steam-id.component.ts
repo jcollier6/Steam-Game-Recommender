@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -12,12 +13,26 @@ import { FormsModule } from '@angular/forms';
 export class EnterSteamIdComponent {
   steamId: string = '';
 
-  constructor(private router: Router) {}
+  constructor(private router: Router, private http: HttpClient) {}
 
   onSubmit() {
     if (this.steamId.trim()) {
       console.log('Steam ID submitted:', this.steamId);
-      this.router.navigate(['/home-page']);
+
+      const url = 'http://localhost:8000/submit-steam-id'; 
+      const body = { steamId: this.steamId };
+      const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+      this.http.post(url, body, { headers }).subscribe({
+        next: (response) => {
+          console.log('Response from server:', response);
+          this.router.navigate(['/home-page']);
+        },
+        error: (error) => {
+          console.error('Error submitting Steam ID:', error);
+          alert(`Error: ${error.error.detail}`);
+        }
+      });
     } else {
       console.error('Steam ID is required.');
     }

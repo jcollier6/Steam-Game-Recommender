@@ -1,5 +1,4 @@
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
 import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
@@ -7,18 +6,11 @@ import requests
 import pandas as pd
 from collections import Counter
 from fastapi.responses import JSONResponse
-import numpy as np
+from pydantic import BaseModel
 
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    get_API_key()
-    prepare_user_info()
-    calculate_recommended_games()
-    yield
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 
 ### database setup
@@ -85,6 +77,40 @@ def get_recently_played():
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
+
+### wait on front end to send steam id
+class SteamIdRequest(BaseModel):
+    steamId: str
+
+@app.post("/submit-steam-id")
+async def submit_steam_id(request: SteamIdRequest):
+    steam_id = request.steamId
+    try:
+        result = await process_steam_id(steam_id)
+        if result["status"] == "error":
+            raise HTTPException(status_code=400, detail=result["message"])
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+async def process_steam_id(steam_id: str):
+    print(f"Processing Steam ID: {steam_id}")
+
+    try:
+        get_API_key()  
+        user_data = is_valid_id(steam_id) 
+        prepare_user_info(user_data)  
+        calculate_recommended_games()  
+
+        print(f"Steam ID {steam_id} processing complete!")
+        return {"status": "success", "message": f"Processed {steam_id}"}
+
+    except ValueError as e:
+        print(f"Error processing Steam ID {steam_id}: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+
 ### recommendation calculation
 
 user_game_scores = dict()
@@ -93,7 +119,7 @@ app_id_to_tags = dict()
 recommended_games = pd.DataFrame()
 df_user_owns = pd.DataFrame()
 API_KEY = ""
-
+steam_id = None 
 
 # prepare cleaned_games information to be merged with other game subsets
 df_metadata = pd.read_csv("cleaned_games.csv", escapechar='\\') 
@@ -108,20 +134,33 @@ def get_API_key():
     except FileNotFoundError:
         print(f"Environment file not found at {'environment.txt'}.")
 
-def prepare_user_info():
+
+def is_valid_id(steam_id):
     API_URL = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"  
-    STEAM_ID = "76561198293567287"  # variable for user id
 
     params = {
         "key": API_KEY,
-        "steamid": STEAM_ID,
+        "steamid": steam_id,
         "format": "json",
     }
+    try:
+        response = requests.get(API_URL, params=params)
+        response.raise_for_status()  
+        
+        user_data = response.json()
+        return user_data
 
-    response = requests.get(API_URL, params=params)
-    data = response.json()
+    except requests.exceptions.HTTPError as http_err:
+        if response.status_code == 400:
+            raise ValueError(f"Invalid Steam ID: {steam_id}")
+        else:
+            raise ValueError(f"HTTP error occurred: {http_err}")
+    except requests.exceptions.RequestException as req_err:
+        raise ValueError(f"Request error occurred: {req_err}")
 
-    owned_games = data.get("response", {}).get("games", [])
+
+def prepare_user_info(user_data):
+    owned_games = user_data.get("response", {}).get("games", [])
 
     user_library_data = [
         {
@@ -182,22 +221,6 @@ def prepare_user_info():
     all_app_ids = set(app_id_to_tags.keys())
     global candidate_app_ids
     candidate_app_ids = all_app_ids - user_owned_app_ids
-
-
-def calculate_recommended_games():
-    results = []
-    for app_id in candidate_app_ids:
-        game_tags = app_id_to_tags[app_id]
-        overlap_score = sum(user_game_scores.get(tag, 0) for tag in game_tags)
-        results.append((app_id, overlap_score))
-
-    df_scores = pd.DataFrame(results, columns=["app_id", "overlap_score"])
-    df_scores.sort_values("overlap_score", ascending=False, inplace=True)
-    df_scores.reset_index(drop=True, inplace=True)
-
-    # add additional game information to the recommended games
-    global recommended_games
-    recommended_games = df_scores.head(100).merge(df_metadata, on="app_id", how="left")
 
 
 def calculate_recommended_games():
