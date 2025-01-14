@@ -22,12 +22,12 @@
 
   <div style="display: flex; flex-direction: column; justify-self: center; font-size: x-large; color: lightgray;">
     @if ( recommendedGameListExist ) {
-      <h1>Top 10 Recommended Games</h1>
-      <ul>
-          @for ( game of recommendedGames; track game ) {
-            <li><strong>{{ game.name }}</strong></li>
+      <h1>Top Recommended Games</h1>
+      <ol>
+        @for ( game of recommendedGames; track game ) {
+          <li><strong>{{ game.name }}</strong></li>
         }
-      </ul>
+      </ol>
     }
     @else {
       <p>No recommended games found.</p>

@@ -7,6 +7,7 @@ import requests
 import pandas as pd
 from collections import Counter
 from fastapi.responses import JSONResponse
+import numpy as np
 
 
 
@@ -86,7 +87,7 @@ def get_recently_played():
 
 ### recommendation calculation
 
-user_tag_profile = dict()
+user_game_scores = dict()
 candidate_app_ids = set()
 app_id_to_tags = dict()
 recommended_games = pd.DataFrame()
@@ -109,7 +110,7 @@ def get_API_key():
 
 def prepare_user_info():
     API_URL = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"  
-    STEAM_ID = "76561198199410747"  # variable for user id
+    STEAM_ID = "76561198293567287"  # variable for user id
 
     params = {
         "key": API_KEY,
@@ -172,8 +173,8 @@ def prepare_user_info():
             for tag in app_id_to_tags[app_id]:
                 user_tag_counts[tag] += weighted_playtime
 
-    global user_tag_profile
-    user_tag_profile = dict(user_tag_counts) # dict {tag: weighted_score}
+    global user_game_scores
+    user_game_scores = dict(user_tag_counts) # dict {tag: weighted_score}
 
     all_app_ids = set(app_id_to_tags.keys())
     global candidate_app_ids
@@ -184,7 +185,7 @@ def calculate_recommended_games():
     results = []
     for app_id in candidate_app_ids:
         game_tags = app_id_to_tags[app_id]
-        overlap_score = sum(user_tag_profile.get(tag, 0) for tag in game_tags)
+        overlap_score = sum(user_game_scores.get(tag, 0) for tag in game_tags)
         results.append((app_id, overlap_score))
 
     df_scores = pd.DataFrame(results, columns=["app_id", "overlap_score"])
@@ -193,6 +194,24 @@ def calculate_recommended_games():
 
     # add additional game information to the recommended games
     global recommended_games
-    recommended_games = df_scores.head(10).merge(df_metadata, on="app_id", how="left")
+    recommended_games = df_scores.head(100).merge(df_metadata, on="app_id", how="left")
 
 
+def calculate_recommended_games():
+    results = []
+    for app_id in candidate_app_ids:
+        game_tags = app_id_to_tags[app_id]
+        overlap_score = sum(user_game_scores.get(tag, 0) for tag in game_tags)
+        results.append((app_id, overlap_score))
+
+    df_scores = pd.DataFrame(results, columns=["app_id", "overlap_score"])
+    df_scores = df_scores.merge(df_metadata[["app_id", "bayesian_score"]],
+                                on="app_id",
+                                how="left")
+    df_scores["final_score"] = df_scores["overlap_score"] * df_scores["bayesian_score"]
+    df_scores.sort_values("final_score", ascending=False, inplace=True)
+
+    df_scores.reset_index(drop=True, inplace=True)
+
+    global recommended_games
+    recommended_games = df_scores.head(100).merge(df_metadata, on="app_id", how="left")
