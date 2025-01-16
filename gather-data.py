@@ -78,7 +78,8 @@ def store_app_details_in_db():
     and genres into 'steam_app_categories' & 'steam_app_genres'.
     """
     batch_counter = 0
-    csv_file = "all_steam_game_ids.csv"
+    csv_file = "all_steam_game_ids.csv" 
+
     try:
         with open(csv_file, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -86,6 +87,11 @@ def store_app_details_in_db():
     except FileNotFoundError:
         print(f"File '{csv_file}' not found. Please run 'gather_all_ids' first.")
         return
+
+    # Preparation for Steam API's max calls of 200 calls every 5 minutes
+    batch_size = 200  
+    duration = 300 
+    start_time = time.time() 
 
     for i, row in enumerate(rows, start=1):
         app_id = row["app_id"]
@@ -206,11 +212,21 @@ def store_app_details_in_db():
         if batch_counter == 1000:
             conn.commit()
             batch_counter = 0
-            time.sleep(1.5)
 
         # Print progress every 100 games
         if i % 100 == 0:
             print(f"Processed {i} apps so far...")
+
+        if i % batch_size == 0:
+            elapsed_time = time.time() - start_time
+            remaining_time = duration - elapsed_time
+
+            if remaining_time > 0:
+                print(f"Pausing for {remaining_time:.2f} seconds...")
+                time.sleep(remaining_time)
+
+            start_time = time.time()  # Reset the timer for the next batch
+
 
     if batch_counter > 0:
         conn.commit()
