@@ -76,10 +76,10 @@ def gather_all_game_ids(API_KEY):
 def store_game_details_in_db(new_ids_only):
     """
     Fetches app IDs from the 'all_steam_game_ids' database table, retrieves details for each app_id via the Steam API,
-    and upserts into 'steam_app_details'. Also normalizes categories and genres into 'steam_app_categories' & 'steam_app_genres'.
+    and upserts into 'steam_game_details'. Also normalizes categories and genres into 'steam_game_categories' & 'steam_game_genres'.
 
     Parameters:
-        new_ids_only (bool): If True, only fetch app_ids that are in 'all_steam_game_ids' but not in 'steam_app_details'.
+        new_ids_only (bool): If True, only fetch app_ids that are in 'all_steam_game_ids' but not in 'steam_game_details'.
     """
     batch_counter = 0
 
@@ -88,7 +88,7 @@ def store_game_details_in_db(new_ids_only):
             query = """
             SELECT a.app_id
             FROM all_steam_game_ids a
-            LEFT JOIN steam_app_details s ON a.app_id = s.app_id
+            LEFT JOIN steam_game_details s ON a.app_id = s.app_id
             WHERE s.app_id IS NULL
             """
         else:
@@ -114,7 +114,7 @@ def store_game_details_in_db(new_ids_only):
 
         if i % 50 == 0:
             print(f"Processed {i} games so far...")
-            
+
         if i % batch_size == 0:
             conn.commit()
             batch_counter = 0
@@ -177,7 +177,7 @@ def store_game_details_in_db(new_ids_only):
         raw_data_json = json.dumps(details)
 
         upsert_sql = """
-        INSERT INTO steam_app_details (
+        INSERT INTO steam_game_details (
             app_id,
             name,
             coming_soon,
@@ -213,8 +213,8 @@ def store_game_details_in_db(new_ids_only):
             continue
 
         # Delete old categories and genres for simplicity
-        delete_cats_sql = "DELETE FROM steam_app_categories WHERE app_id=%s"
-        delete_gens_sql = "DELETE FROM steam_app_genres WHERE app_id=%s"
+        delete_cats_sql = "DELETE FROM steam_game_categories WHERE app_id=%s"
+        delete_gens_sql = "DELETE FROM steam_game_genres WHERE app_id=%s"
         cursor.execute(delete_cats_sql, (app_id,))
         cursor.execute(delete_gens_sql, (app_id,))
 
@@ -224,7 +224,7 @@ def store_game_details_in_db(new_ids_only):
             cat_name = cat_obj.get("description", "")
             if cat_name:
                 cat_insert_sql = """
-                INSERT INTO steam_app_categories (app_id, category_name)
+                INSERT INTO steam_game_categories (app_id, category_name)
                 VALUES (%s, %s)
                 """
                 cursor.execute(cat_insert_sql, (app_id, cat_name))
@@ -235,7 +235,7 @@ def store_game_details_in_db(new_ids_only):
             gen_name = gen_obj.get("description", "")
             if gen_name:
                 gen_insert_sql = """
-                INSERT INTO steam_app_genres (app_id, genre_name)
+                INSERT INTO steam_game_genres (app_id, genre_name)
                 VALUES (%s, %s)
                 """
                 cursor.execute(gen_insert_sql, (app_id, gen_name))
