@@ -73,17 +73,28 @@ def gather_all_game_ids(API_KEY):
 
 
 
-def store_game_details_in_db():
+def store_game_details_in_db(new_ids_only):
     """
-    Fetches app IDs from the 'all_steam_game_ids' database table, 
-    retrieves details for each app_id via the Steam API, 
-    and upserts into 'steam_app_details'. Also normalizes categories 
-    and genres into 'steam_app_categories' & 'steam_app_genres'.
+    Fetches app IDs from the 'all_steam_game_ids' database table, retrieves details for each app_id via the Steam API,
+    and upserts into 'steam_app_details'. Also normalizes categories and genres into 'steam_app_categories' & 'steam_app_genres'.
+
+    Parameters:
+        new_ids_only (bool): If True, only fetch app_ids that are in 'all_steam_game_ids' but not in 'steam_app_details'.
     """
     batch_counter = 0
 
     try:
-        cursor.execute("SELECT app_id FROM all_steam_game_ids")
+        if new_ids_only:
+            query = """
+            SELECT a.app_id
+            FROM all_steam_game_ids a
+            LEFT JOIN steam_app_details s ON a.app_id = s.app_id
+            WHERE s.app_id IS NULL
+            """
+        else:
+            query = "SELECT app_id FROM all_steam_game_ids"
+
+        cursor.execute(query)
         rows = cursor.fetchall() 
     except mysql.connector.Error as err:
         print(f"Failed to fetch app IDs from the database: {err}")
@@ -91,14 +102,32 @@ def store_game_details_in_db():
 
     app_ids = [row[0] for row in rows]
 
-    # Preparation for Steam API's max calls of 200 calls every 5 minutes
-    batch_size = 200  
+    # Preparation for Steam API's max calls of 200 calls every 5 minutes. For all games on Steam, approximate run time: 52 hours
+    batch_size = 200
     duration = 300 
     start_time = time.time() 
 
-    for i, app_id  in enumerate(app_ids, start=1):
+    for i, app_id  in enumerate(app_ids, start=1):    
         if not str(app_id).isdigit():
+            print(f"{app_id} appid contains non digits")
             continue 
+
+        if i % 50 == 0:
+            print(f"Processed {i} games so far...")
+            
+        if i % batch_size == 0:
+            conn.commit()
+            batch_counter = 0
+            elapsed_time = time.time() - start_time
+            remaining_time = duration - elapsed_time
+
+            if remaining_time > 0:
+                print(f"Pausing for {remaining_time:.2f} seconds...")
+                time.sleep(remaining_time)
+
+            start_time = time.time()  # Reset the timer for the next batch
+
+        batch_counter += 1
 
         details_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
         try:
@@ -119,8 +148,9 @@ def store_game_details_in_db():
 
         app_key = str(app_id)
         app_info = data.get(app_key, {})
+        # If this occurs, it is not accessible on the Steam store either because of region lock or it has been removed from the store but Steam didn't remove it from their app_id list.
         if not app_info.get("success", False):
-            continue
+            continue 
 
         details = app_info.get("data", {})
 
@@ -210,34 +240,15 @@ def store_game_details_in_db():
                 """
                 cursor.execute(gen_insert_sql, (app_id, gen_name))
 
-        batch_counter += 1
-        if batch_counter == 200:
-            conn.commit()
-            batch_counter = 0
-
-        # Print progress every 50 games
-        if i % 50 == 0:
-            print(f"Processed {i} apps so far...")
-
-        if i % batch_size == 0:
-            elapsed_time = time.time() - start_time
-            remaining_time = duration - elapsed_time
-
-            if remaining_time > 0:
-                print(f"Pausing for {remaining_time:.2f} seconds...")
-                time.sleep(remaining_time)
-
-            start_time = time.time()  # Reset the timer for the next batch
-
-
     if batch_counter > 0:
         conn.commit()
+        batch_counter = 0
 
     print("Finished storing all game details into the database.")
 
 def main():
     parser = argparse.ArgumentParser(description="Gather Steam Store data.")
-    parser.add_argument("--type", choices=["all-ids", "store-details"], help="Type of data to gather/store")
+    parser.add_argument("--type", choices=["all-ids", "gather-all-games-info", "gather-new-games-only"], help="Gather and store game data from Steam API")
     args = parser.parse_args()
 
     API_KEY = ""
@@ -249,10 +260,12 @@ def main():
 
     if args.type == "all-ids":
         gather_all_game_ids(API_KEY)
-    elif args.type == "store-details":
-        store_game_details_in_db()
+    elif args.type == "gather-all-games-info":
+        store_game_details_in_db(False)
+    elif args.type == "gather-new-games-only":
+        store_game_details_in_db(True)
     else:
-        print("Please use --type all-ids or --type store-details")
+        print("Please use --type all-ids or --type gather-new-games-only or --type gather-all-games-info")
 
 
 if __name__ == "__main__":
