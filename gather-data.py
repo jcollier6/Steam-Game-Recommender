@@ -1,5 +1,4 @@
 import argparse
-import csv
 import json
 import time
 from datetime import datetime
@@ -246,9 +245,63 @@ def store_game_details_in_db(new_ids_only):
 
     print("Finished storing all game details into the database.")
 
+
+
+def store_game_tags_in_db(new_ids_only):
+    """
+    Store game tags in the database. Optionally fetch only missing app_ids.
+    Parameters:
+        new_ids_only (bool): If True, only fetch app_ids that are in 'all_steam_game_ids' but not in 'steam_game_tags'.
+    """
+    if new_ids_only:
+        query = """
+        SELECT app_id FROM all_steam_game_ids 
+        WHERE app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_tags)
+        """
+    else:
+        query = "SELECT app_id FROM all_steam_game_ids"
+
+    cursor.execute(query)
+    app_ids = cursor.fetchall()
+
+    base_url = "https://steamspy.com/api.php?request=appdetails&appid={}"
+
+    commit_interval = 200
+    processed_count = 0
+
+    for (app_id,) in app_ids:
+        try:
+            response = requests.get(base_url.format(app_id))
+            response.raise_for_status()
+            data = response.json()
+            tags = data.get("tags", {})
+
+            for tag in tags:
+                upsert_query = """
+                INSERT INTO steam_game_tags (app_id, tag) 
+                VALUES (%s, %s) 
+                ON DUPLICATE KEY UPDATE tag=VALUES(tag)
+                """
+                cursor.execute(upsert_query, (app_id, tag))
+
+            processed_count += 1
+
+            if processed_count % commit_interval == 0:
+                conn.commit()
+                print(f"Processed {processed_count} games tags so far...")
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching data for app_id {app_id}: {e}")
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON for app_id {app_id}: {e}")
+
+    conn.commit()
+    
+
+
 def main():
     parser = argparse.ArgumentParser(description="Gather Steam Store data.")
-    parser.add_argument("--type", choices=["all-ids", "gather-all-games-info", "gather-new-games-only"], help="Gather and store game data from Steam API")
+    parser.add_argument("--type", choices=["all-ids", "gather-all-games-info", "gather-new-games-info", "gather-games-tags", "gather-new-games-tags"], help="Gather and store game data from Steam API")
     args = parser.parse_args()
 
     API_KEY = ""
@@ -262,11 +315,17 @@ def main():
         gather_all_game_ids(API_KEY)
     elif args.type == "gather-all-games-info":
         store_game_details_in_db(False)
-    elif args.type == "gather-new-games-only":
+    elif args.type == "gather-new-games-info":
         store_game_details_in_db(True)
+    elif args.type == "gather-games-tags":
+        store_game_tags_in_db(True)
+    elif args.type == "gather-new-games-tags":
+        store_game_tags_in_db(True)
     else:
-        print("Please use --type all-ids or --type gather-new-games-only or --type gather-all-games-info")
+        print("Please use --type all-ids or --type gather-new-games-info or --type gather-all-games-info or --type gather-games-tags --type gather-new-games-tags")
 
+    cursor.close()
+    conn.close()
 
 if __name__ == "__main__":
     main()
