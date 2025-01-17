@@ -8,8 +8,6 @@ import requests
 import mysql.connector
 from fastapi import FastAPI
 
-app = FastAPI()
-
 # ---- MySQL CONNECTION ----
 conn = mysql.connector.connect(
     host="localhost",
@@ -20,7 +18,7 @@ conn = mysql.connector.connect(
 cursor = conn.cursor()
 
 
-def gather_all_ids(API_KEY):
+def gather_all_game_ids(API_KEY):
     BASE_URL = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
     
     params = {
@@ -33,7 +31,7 @@ def gather_all_ids(API_KEY):
         "max_results": 50000, 
     }
 
-    all_apps = []
+    all_new_games = []
     last_appid = 0
 
     while True:
@@ -43,35 +41,39 @@ def gather_all_ids(API_KEY):
 
         if response.status_code == 200:
             data = response.json()
-            apps = data.get("response", {}).get("apps", [])
+            games = data.get("response", {}).get("apps", [])
 
-            if not apps:
+            if not games:
                 break 
 
-            all_apps.extend(apps)
-            last_appid = apps[-1]["appid"]  
+            all_new_games.extend(games)
+            last_appid = games[-1]["appid"]  
 
-            print(f"Fetched {len(apps)} apps, total so far: {len(all_apps)}")
+            print(f"Fetched {len(games)} games, total so far: {len(all_new_games)}")
         else:
             print(f"Failed to fetch data. Status code: {response.status_code}")
             break
 
-    unique_apps = {app["appid"]: app for app in all_apps}.values()
+    current_unique_games = {game["appid"]: game for game in all_new_games}.values()
 
-    csv_file = "all_steam_game_ids.csv"
+    cursor.execute("SELECT appid FROM all_steam_game_ids")
+    existing_appids = {row[0] for row in cursor.fetchall()}
 
-    with open(csv_file, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow(["app_id", "name"])
+    new_games = [game for game in current_unique_games if game["appid"] not in existing_appids]
 
-        for app in unique_apps:
-            writer.writerow([app.get("appid"), app.get("name")])
+    for game in new_games:
+        cursor.execute(
+            "INSERT INTO all_steam_game_ids (appid, name) VALUES (%s, %s)",
+            (game["appid"], game["name"])
+        )
+    
+    conn.commit()
 
-    print(f"Data successfully saved to {csv_file}. Total unique apps: {len(unique_apps)}")
+    print(f"{len(new_games)} new game ids added to the database.")
 
 
 
-def store_app_details_in_db():
+def store_game_details_in_db():
     """
     Reads 'all_steam_game_ids.csv', fetches details for each app_id,
     and upserts into 'steam_app_details'. Also normalizes categories
@@ -231,7 +233,7 @@ def store_app_details_in_db():
     if batch_counter > 0:
         conn.commit()
 
-    print("Finished storing all app details into the database.")
+    print("Finished storing all game details into the database.")
 
 def main():
     parser = argparse.ArgumentParser(description="Gather Steam Store data.")
@@ -246,9 +248,9 @@ def main():
         print("Environment file not found at 'environment.txt'.")
 
     if args.type == "all-ids":
-        gather_all_ids(API_KEY)
+        gather_all_game_ids(API_KEY)
     elif args.type == "store-details":
-        store_app_details_in_db()
+        store_game_details_in_db()
     else:
         print("Please use --type all-ids or --type store-details")
 
