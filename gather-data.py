@@ -47,7 +47,7 @@ def gather_all_game_ids(API_KEY):
                 break 
 
             all_new_games.extend(games)
-            last_appid = games[-1]["appid"]  
+            last_appid = games[-1]["appid"]  # steam calls them appid instead of app_id
 
             print(f"Fetched {len(games)} games, total so far: {len(all_new_games)}")
         else:
@@ -56,14 +56,14 @@ def gather_all_game_ids(API_KEY):
 
     current_unique_games = {game["appid"]: game for game in all_new_games}.values()
 
-    cursor.execute("SELECT appid FROM all_steam_game_ids")
+    cursor.execute("SELECT app_id FROM all_steam_game_ids")
     existing_appids = {row[0] for row in cursor.fetchall()}
 
     new_games = [game for game in current_unique_games if game["appid"] not in existing_appids]
 
     for game in new_games:
         cursor.execute(
-            "INSERT INTO all_steam_game_ids (appid, name) VALUES (%s, %s)",
+            "INSERT INTO all_steam_game_ids (app_id, name) VALUES (%s, %s)",
             (game["appid"], game["name"])
         )
     
@@ -75,29 +75,29 @@ def gather_all_game_ids(API_KEY):
 
 def store_game_details_in_db():
     """
-    Reads 'all_steam_game_ids.csv', fetches details for each app_id,
-    and upserts into 'steam_app_details'. Also normalizes categories
+    Fetches app IDs from the 'all_steam_game_ids' database table, 
+    retrieves details for each app_id via the Steam API, 
+    and upserts into 'steam_app_details'. Also normalizes categories 
     and genres into 'steam_app_categories' & 'steam_app_genres'.
     """
     batch_counter = 0
-    csv_file = "all_steam_game_ids.csv" 
 
     try:
-        with open(csv_file, mode="r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)  
-    except FileNotFoundError:
-        print(f"File '{csv_file}' not found. Please run 'gather_all_ids' first.")
+        cursor.execute("SELECT app_id FROM all_steam_game_ids")
+        rows = cursor.fetchall() 
+    except mysql.connector.Error as err:
+        print(f"Failed to fetch app IDs from the database: {err}")
         return
+
+    app_ids = [row[0] for row in rows]
 
     # Preparation for Steam API's max calls of 200 calls every 5 minutes
     batch_size = 200  
     duration = 300 
     start_time = time.time() 
 
-    for i, row in enumerate(rows, start=1):
-        app_id = row["app_id"]
-        if not app_id.isdigit():
+    for i, app_id  in enumerate(app_ids, start=1):
+        if not str(app_id).isdigit():
             continue 
 
         details_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
@@ -211,12 +211,12 @@ def store_game_details_in_db():
                 cursor.execute(gen_insert_sql, (app_id, gen_name))
 
         batch_counter += 1
-        if batch_counter == 1000:
+        if batch_counter == 200:
             conn.commit()
             batch_counter = 0
 
-        # Print progress every 100 games
-        if i % 100 == 0:
+        # Print progress every 50 games
+        if i % 50 == 0:
             print(f"Processed {i} apps so far...")
 
         if i % batch_size == 0:
