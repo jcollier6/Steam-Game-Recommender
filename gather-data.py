@@ -251,15 +251,15 @@ def store_game_tags_in_db(new_ids_only):
     """
     Store game tags in the database. Optionally fetch only missing app_ids.
     Parameters:
-        new_ids_only (bool): If True, only fetch app_ids that are in 'all_steam_game_ids' but not in 'steam_game_tags'.
+        new_ids_only (bool): If True, only fetch app_ids that are in 'steam_game_details' but not in 'steam_game_tags'.
     """
     if new_ids_only:
         query = """
-        SELECT app_id FROM all_steam_game_ids 
+        SELECT app_id FROM steam_game_details 
         WHERE app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_tags)
         """
     else:
-        query = "SELECT app_id FROM all_steam_game_ids"
+        query = "SELECT app_id FROM steam_game_details"
 
     cursor.execute(query)
     app_ids = cursor.fetchall()
