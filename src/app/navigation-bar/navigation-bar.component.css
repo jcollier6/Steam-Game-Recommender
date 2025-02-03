@@ -1,0 +1,79 @@
+.nav-bar {
+    overflow: hidden;
+    height: 90px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: center;
+    justify-content: center;
+}
+.logo {
+    padding: 20px;
+    -webkit-filter: drop-shadow(3px 3px 4px #0000003f);
+    filter: drop-shadow(3px 3px 4px #0000003f);
+}
+.text-steam-recommender {
+    display: flex;
+    justify-content: center;
+    text-wrap: nowrap;
+    color: #ffffff;
+    font-size: 40px;
+    font-family: Inter;
+    letter-spacing: 0%;
+    font-weight: 400;
+    text-shadow: 3px 3px 2px #596beb;
+}
+.nav-button-holder {
+    display: flex;
+    align-items: end;
+    justify-content: end;
+    gap: 30px;
+    padding-right: 40px;
+    padding-left: 40px;
+}
+.home-button {
+    display: flex;
+    justify-content: center;
+    flex-wrap: nowrap;
+    align-items: center;
+    box-sizing: border-box;
+    border-radius: 14px;
+    background: #596beb;
+    width: 70px;
+    height: 36px;
+    box-shadow: 3px 3px 4px 0px #0000003f;
+}
+.home-text {
+    color: #ffffff;
+    font-size: 16px;
+    font-family: Inter;
+    letter-spacing: 0%;
+    text-decoration: none;
+    font-weight: 500;
+    text-align: center;
+    text-wrap: nowrap;
+}
+
+.log-in-button {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    border-radius: 14px;
+    background: #596beb;
+    width: 70px;
+    height: 36px;
+    box-shadow: 3px 3px 4px 0px #0000003f;
+}
+.log-in-text {
+    color: #ffffff;
+    font-size: 16px;
+    font-family: Inter;
+    letter-spacing: 0%;
+    text-decoration: none;
+    font-weight: 500;
+    text-align: center;
+    text-wrap: nowrap;
+}
