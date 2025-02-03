@@ -1,5 +1,9 @@
 # Steam Game Recommender
 
+## UI Mockup
+
+UI Mockups made on Figma. Prototype available [here](https://www.figma.com/proto/i6GKXkI2IO2LfhrwlazxU3/Steam-Game-Recommender?)
+
 ## Build
 
 Run `python -m uvicorn main:app --reload` in the project folder to build it before starting the server.
