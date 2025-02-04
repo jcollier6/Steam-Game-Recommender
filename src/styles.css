@@ -2,24 +2,25 @@ html, body {
     height: 100%;
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
     background-color: #222222;
 }
 
 app-root {
-    display: block;
     height: 100%;
 }
 
 
 button {
     border: none;
-    border-radius: 5px;
-    background-color: #656565;
-    color: white;
     cursor: pointer;
 }
 
-button:hover {
-    background-color: #555555; 
+
+
+a {
+    color: #596BEB;
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline; 
 }
