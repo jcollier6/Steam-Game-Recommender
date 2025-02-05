@@ -9,11 +9,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 
-
-app = FastAPI()
-
-
 ### database setup
+app = FastAPI()
 
 conn = mysql.connector.connect(
     host="localhost",
@@ -28,6 +25,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
 @app.get("/")
 def root():
     return {"message": "Hello World"}
@@ -42,7 +40,7 @@ def get_games():
 @app.get("/get_tags")
 def get_tags():
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM tags")
+    cursor.execute("SELECT * FROM steam_game_tags")
     records = cursor.fetchall()
     return records
 

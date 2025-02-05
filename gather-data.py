@@ -248,6 +248,7 @@ def store_game_details_in_db(new_ids_only):
 
 
 def store_game_tags_in_db(new_ids_only):
+    print("Now running with new_ids_only =", new_ids_only)
     """
     Store game tags in the database. Optionally fetch only missing app_ids.
     Parameters:
@@ -276,13 +277,22 @@ def store_game_tags_in_db(new_ids_only):
             data = response.json()
             tags = data.get("tags", {})
 
-            for tag in tags:
-                upsert_query = """
-                INSERT INTO steam_game_tags (app_id, tag) 
-                VALUES (%s, %s) 
+            if tags:
+                for tag in tags:
+                    upsert_query = """
+                    INSERT INTO steam_game_tags (app_id, tag) 
+                    VALUES (%s, %s) 
+                    ON DUPLICATE KEY UPDATE tag=VALUES(tag)
+                    """
+                    cursor.execute(upsert_query, (app_id, tag))
+            else:
+                # Insert a placeholder to mark that this game has been processed
+                placeholder_query = """
+                INSERT INTO steam_game_tags (app_id, tag)
+                VALUES (%s, %s)
                 ON DUPLICATE KEY UPDATE tag=VALUES(tag)
                 """
-                cursor.execute(upsert_query, (app_id, tag))
+                cursor.execute(placeholder_query, (app_id, "no_tags"))
 
             processed_count += 1
 
