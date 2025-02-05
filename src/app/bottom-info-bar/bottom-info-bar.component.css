@@ -7,21 +7,17 @@
   border-top: 2px solid #19212E;
   width: 80vw;
   height: 50px;
+  font-size: var(--font-size-standard);
+  text-wrap: nowrap;
 }
-.powered-by-text {
-  color: #ffffff;
-  font-size: 12px;
-  font-family: Inter;
+.link {
   padding: 0.2rem;
 }
 .about-button {
-  color: #ffffff;
-  font-size: 12px;
-  font-family: Inter;
-  text-wrap: nowrap;
+  font-size: var(--font-size-standard);
   background-color: transparent;
-  padding: 0;
 }
 .about-button:hover {
   text-decoration: underline;
 }
+

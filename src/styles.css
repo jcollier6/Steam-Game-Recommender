@@ -1,8 +1,20 @@
+:root {
+    --font-size-small: 0.5rem;
+    --font-size-standard: 0.75rem;
+    --font-size-large: 1rem;
+    --font-size-title: 2.5rem;
+
+    --accent-color: #596beb;
+    --border-radius: 14px;
+}
+
 html, body {
     height: 100%;
     margin: 0;
     padding: 0;
     background-color: #222222;
+    font-family: Inter;
+    color: white;
 }
 
 app-root {
@@ -13,6 +25,11 @@ app-root {
 button {
     border: none;
     cursor: pointer;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: nowrap;
 }
 
 
