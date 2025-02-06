@@ -14,7 +14,7 @@
 .text-steam-recommender {
     text-wrap: nowrap;
     text-align: center;
-    font-size: var(--font-size-title);
+    font-size: clamp(var(--font-size-title-min), 2.5vw, var(--font-size-title));
     text-shadow: 3px 3px 2px var(--accent-color);
 }
 .nav-button-holder {
@@ -27,20 +27,19 @@
 button {
     border-radius: var(--border-radius);
     background: var(--accent-color);
-    width: 4.5rem;
+    width: clamp(3rem, 8vw, 4.5rem);
     height: 2.5rem;
     box-shadow: 3px 3px 4px 0px #0000003f;
+    font-size: clamp(var(--font-size-standard), 2vw, var(--font-size-large));
 }
 button:hover {
     background: var(--button-hover-color);
 }
 .home-text {
-    font-size: var(--font-size-large);
     font-weight: bold;
     text-wrap: nowrap;
 }
 .log-in-text {
-    font-size: var(--font-size-large);
     font-weight: bold;
     text-wrap: nowrap;
 }

@@ -12,6 +12,7 @@ router-outlet + * {
     --font-size-standard: 0.75rem;
     --font-size-large: 1rem;
     --font-size-title: 2.5rem;
+    --font-size-title-min: 1.5rem;
 
     --accent-color: #596beb;
     --button-hover-color: #6877E2;
