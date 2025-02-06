@@ -1,0 +1,25 @@
+
+<div class="page-layout">
+    <span class="sign-in-text">
+        Enter A Steam ID For <br>Personalized Recommendations
+    </span>
+    <div class="content-holder">
+        <label>
+            Steam ID
+        </label>
+        <div class="steamid-holder">
+            <input type="text" 
+            [formControl]="idInput" 
+            placeholder="Enter ID" />
+
+            <!-- Show error message if input is invalid -->
+            <span *ngIf="isInvalid" class="error-text">
+                ID must contain only numbers!
+            </span>
+        </div>
+        <button>Get Recommendations</button>
+        <div class="link-holder">
+            <a href="https://help.steampowered.com/en/faqs/view/2816-BE67-5B69-0FEC">Don't know your ID?</a>
+        </div>
+    </div>
+</div>

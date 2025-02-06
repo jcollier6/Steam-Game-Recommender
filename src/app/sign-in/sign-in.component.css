@@ -1,0 +1,63 @@
+.page-layout {
+  flex-grow: 1;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-wrap: nowrap;
+}
+.sign-in-text {
+  text-align: center;
+  font-size: clamp(var(--font-size-title-min), 2.5vw, var(--font-size-title));
+  margin-bottom: 4rem;
+}
+.content-holder {
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-items: start;
+  height: 20vh;
+  width: clamp(14rem, 20vw, 24rem);
+}
+.steamid-holder {
+  font-size: var(--font-size-large);
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.75rem;
+  width: 100%;
+}
+.error-text {
+  color: red;
+  margin: 4px;
+}
+.link-holder{
+  text-align: center;
+  width: 100%;
+}
+
+input {
+  border: 2px solid #303348;
+  font-size: var(--font-size-large);
+  padding: 8px;
+  color: white !important;
+  outline: none;
+  background-color: transparent;
+  border-radius: var(--border-radius);
+}
+button {
+  font-size: var(--font-size-large);
+  min-height: 2.5rem;
+  width: 100%;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border-radius: var(--border-radius);
+  background: var(--accent-color);
+}
+button:hover {
+  background: var(--button-hover-color);
+}
+a {
+  margin: 6px;
+  color: white;
+}
