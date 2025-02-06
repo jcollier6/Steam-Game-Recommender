@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ChangeDetectorRef  } from '@angular/core';
+import { Router, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-navigation-bar',
@@ -9,5 +11,22 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NavigationBarComponent {
-  @Input() signIn: string = "Log In";
+  signIn: string = 'Log In';
+
+  constructor(
+    private router: Router, 
+    private cdr: ChangeDetectorRef) {}
+
+  ngOnInit(): void {
+    this.router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd)
+    ).subscribe(event => {
+      if (event.url.includes('/home-page')) {
+        this.signIn = 'Log Out';
+      } else {
+        this.signIn = 'Log In';
+      }
+      this.cdr.detectChanges();
+    });
+  }
 }

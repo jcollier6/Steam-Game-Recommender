@@ -31,15 +31,9 @@ button {
     height: 2.5rem;
     box-shadow: 3px 3px 4px 0px #0000003f;
     font-size: clamp(var(--font-size-standard), 2vw, var(--font-size-large));
+    font-weight: bold;
+    text-wrap: nowrap;
 }
 button:hover {
-    background: var(--button-hover-color);
-}
-.home-text {
-    font-weight: bold;
-    text-wrap: nowrap;
-}
-.log-in-text {
-    font-weight: bold;
-    text-wrap: nowrap;
+    border: 1px solid white;
 }
