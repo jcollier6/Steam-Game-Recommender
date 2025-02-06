@@ -7,19 +7,40 @@
         <label>
             Steam ID
         </label>
-        <div class="steamid-holder">
-            <input type="text" 
-            [formControl]="idInput" 
-            placeholder="Enter ID" />
 
-            <!-- Show error message if input is invalid -->
-            <span *ngIf="isInvalid" class="error-text">
-                ID must contain only numbers!
-            </span>
-        </div>
-        <button>Get Recommendations</button>
+        <form (ngSubmit)="onSubmit()" #steamIdForm="ngForm">
+            <div class="steamid-holder">
+                <input
+                    type="text"
+                    id="steamId"
+                    name="steamId"
+                    [(ngModel)]="steamId"
+                    placeholder="Enter ID"
+                    required
+                />
+
+                <!-- Show error message if input is invalid -->
+                <span *ngIf="isInvalid" class="error-text">
+                    ID must contain only numbers!
+                </span>
+            </div>
+            <button
+                type="submit"
+                [disabled]="loading || !steamIdForm.valid"
+                [ngClass]="{ 'loading': loading }"
+            >
+                <span *ngIf="!loading">Get Recommendations</span>
+                <span *ngIf="loading">Loading...</span>
+            </button>
+        </form>
+
         <div class="link-holder">
             <a href="https://help.steampowered.com/en/faqs/view/2816-BE67-5B69-0FEC">Don't know your ID?</a>
         </div>
     </div>
 </div>
+
+
+<div *ngIf="loading" class="loading-overlay">
+    <div class="spinner"></div>
+</div> 
