@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, ChangeDetectorRef  } from '@angular/core';
-import { Router, NavigationEnd } from '@angular/router';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 
 @Component({
   selector: 'app-navigation-bar',
   standalone: true,
-  imports: [],
+  imports: [ RouterModule ],
   templateUrl: './navigation-bar.component.html',
   styleUrl: './navigation-bar.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
