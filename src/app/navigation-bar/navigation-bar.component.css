@@ -24,12 +24,15 @@
     gap: 1rem;
     padding: 1rem;
 }
-.button {
+button {
     border-radius: var(--border-radius);
     background: var(--accent-color);
     width: 4.5rem;
     height: 2.5rem;
     box-shadow: 3px 3px 4px 0px #0000003f;
+}
+button:hover {
+    background: var(--button-hover-color);
 }
 .home-text {
     font-size: var(--font-size-large);
