@@ -14,21 +14,37 @@ router-outlet + * {
     --font-size-title: 2.5rem;
     --font-size-title-min: 1.5rem;
 
+    --primary-color: #0E1724;
+    --secondary-color: #19212E;
     --accent-color: #596beb;
-    --button-hover-color: #6877E2;
     --border-radius: 14px;
 }
 html, body {
-    height: 100%;
+    min-height: 100%;
     margin: 0;
     padding: 0;
-    background-color: #222222;
     font-family: Inter;
     color: white;
+                           
+    background-image: 
+        repeating-linear-gradient(
+        45deg,
+        rgba(23, 32, 230, 0.1),
+        transparent 5px
+        ),
+        linear-gradient(
+            to right top, 
+            var(--primary-color), 
+            #121c2a, 
+            #17212f, /* Inbetween colors generated on mycolor.space to smooth the color transition */
+            #1b2635, 
+            var(--secondary-color)
+        );
+    
 }
 
 a {
-    color: #596BEB;
+    color: var(--accent-color);
     text-decoration: none;
 }
 a:hover {
