@@ -2,12 +2,13 @@ import { Component, OnInit } from '@angular/core';
 import { GameService, Recommended_Game, Recent_Game } from '../services/game.service';
 import { HttpClientModule } from '@angular/common/http';
 import { RouterModule } from '@angular/router';
+import { RecommendationCarouselComponent } from '../recommendation-carousel/recommendation-carousel.component';
 
 @Component({
   selector: 'home-page',
   standalone: true,
   templateUrl: './home-page.component.html',
-  imports: [ HttpClientModule, RouterModule],
+  imports: [HttpClientModule, RouterModule, RecommendationCarouselComponent],
   providers: [ HttpClientModule, GameService ],
   styleUrls: ['./home-page.component.css']
 })

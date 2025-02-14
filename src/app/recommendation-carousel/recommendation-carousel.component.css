@@ -1,0 +1,147 @@
+
+.content {
+    margin-top: 1rem !important;
+    margin-bottom: 1rem;
+}
+@media (max-width: 896px) {
+    .recommended-games-holder button {
+        display: none !important;
+    }
+    .game-info-holder .screenshots-holder {
+        display: none !important;
+    }
+    .recommended-games {
+        flex-direction: column;
+    }
+    .view-all-button {
+        font-size: var(--font-size-large) !important;
+    }
+    .recommended-title-holder {
+        font-size: var(--font-size-large) !important;
+    }
+    .game-title {
+        font-size: var(--font-size-large) !important;
+    }
+    .recommendation-justification {
+        font-size: var(--font-size-standard) !important;
+    }
+    .price {
+        font-size: var(--font-size-standard) !important;
+    }
+}
+
+/* Mobile up to 896px wide */
+@media (min-width: 896px) {
+    .content {
+        height: 24rem;
+    }
+}
+
+/* Screen size up to 720p */
+@media (min-width: 1280px) {
+    .content {
+        height: 30rem;
+    }
+}
+
+/* Desktop above 1080p */
+@media (min-width: 1921px) {
+    .content {
+        height: 36rem;
+    }
+}
+
+.recommended-title-holder {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    width: 100%;
+    height: 10%;
+    padding: 0.5vw;
+    font-size: var(--font-size-h1);
+}
+.view-all-button {
+    font-size: var(--font-size-h1);
+    color: var(--accent-color);
+    background-color: transparent;
+    font-weight: bold;
+}
+.view-all-button:hover {
+    text-decoration: underline;
+}
+.recommended-games-holder {
+    display: flex;
+    width: 100%;
+    height: 90%;
+    background-color: var(--secondary-color);
+    border-radius: var(--border-radius);
+}
+.recommended-games-holder button {
+    width: 4%;
+    background-color: var(--secondary-color);
+    border-radius: var(--border-radius);
+}
+.right-arrow {
+    transform: scaleX(-1);
+}
+.recommended-games {
+    display: flex;
+}
+.game-thumbnail {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+}
+.game-info-holder {
+    display: flex;
+    flex-direction: column;
+    padding: 1vw;
+    width: 100%;
+    gap: 1vw;
+    position: relative;
+}
+.game-title {
+    font-size: var(--font-size-h1);
+    word-break: break-word; 
+    text-overflow: ellipsis;
+    overflow: hidden;
+    line-clamp: 2;
+    line-height: 1.1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: ellipsis;
+}
+.screenshots-holder {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); 
+    grid-template-rows: repeat(2, 1fr);    
+    gap: 0.5rem; 
+    width: 100%; 
+}
+.screenshot {
+    aspect-ratio: 16 / 9;
+    background-size: cover;
+    background-position: center;
+}
+.screenshot:nth-child(1) { background-image: url('../../assets/No-Image-Available.png'); }
+.screenshot:nth-child(2) { background-image: url('../../assets/No-Image-Available.png'); }
+.screenshot:nth-child(3) { background-image: url('../../assets/No-Image-Available.png'); }
+.screenshot:nth-child(4) { background-image: url('../../assets/No-Image-Available.png'); }
+
+.recommendation-justification {
+    font-size: clamp(var(--font-size-small), 1vw, var(--font-size-large));
+}
+.tags-holder {
+    height: fit-content;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.price {
+    font-size: clamp(var(--font-size-small), 1vw, var(--font-size-large));
+    margin-top: auto;
+    align-items: flex-start;
+}

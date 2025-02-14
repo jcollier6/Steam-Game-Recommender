@@ -14,7 +14,7 @@
 .text-steam-recommender {
     text-wrap: nowrap;
     text-align: center;
-    font-size: clamp(var(--font-size-title-min), 2.5vw, var(--font-size-title));
+    font-size: var(--font-size-title);
     text-shadow: 3px 3px 2px var(--accent-color);
 }
 .nav-button-holder {
