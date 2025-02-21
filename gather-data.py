@@ -16,7 +16,7 @@ conn = mysql.connector.connect(
 cursor = conn.cursor()
 
 
-def gather_all_game_ids(API_KEY):
+def gather_all_game_ids(API_KEY: str):
     BASE_URL = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
     
     params = {
@@ -71,7 +71,7 @@ def gather_all_game_ids(API_KEY):
 
 
 
-def store_game_details_in_db(new_ids_only):
+def store_game_details_in_db(new_ids_only: bool):
     """
     Fetches app IDs from the 'all_steam_game_ids' database table, retrieves details for each app_id via the Steam API,
     and upserts into 'steam_game_details'. Also normalizes categories and genres into 'steam_game_categories' & 'steam_game_genres'.
@@ -246,7 +246,7 @@ def store_game_details_in_db(new_ids_only):
 
 
 
-def store_game_tags_in_db(new_ids_only):
+def store_game_tags_in_db(new_ids_only: bool):
     print("Now running with new_ids_only =", new_ids_only)
     """
     Store game tags in the database. Optionally fetch only missing app_ids.
@@ -306,8 +306,49 @@ def store_game_tags_in_db(new_ids_only):
 
     conn.commit()
 
+def scrape_reviews(soup: BeautifulSoup, app_id: str):
+    positive_input = soup.find("input", id="review_summary_num_positive_reviews")
+    total_input = soup.find("input", id="review_summary_num_reviews")
 
-def store_game_reviews_in_db(new_ids_only):
+    # Check if the page indicates that there are no reviews yet.
+    if positive_input is None or total_input is None:
+        no_reviews_div = soup.find("div", class_="noReviewsYetTitle")
+        if no_reviews_div is not None:
+            positive = 0
+            total = 0
+            negative = 0
+        else:
+            print(f"Missing review elements for app_id {app_id} and no 'noReviewsYetTitle' div found. Skipping.")
+            return
+    else:
+        try:
+            positive = int(positive_input.get("value", 0))
+            total = int(total_input.get("value", 0))
+        except ValueError as ve:
+            print(f"Error converting review numbers for app_id {app_id}: {ve}")
+            return
+        negative = total - positive
+
+    # Update or insert review data
+    try:
+        sql = """
+        INSERT INTO steam_game_reviews (app_id, positive, negative, total)
+        VALUES (%s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            positive = VALUES(positive),
+            negative = VALUES(negative),
+            total = VALUES(total)
+        """
+        values = (app_id, positive, negative, total)
+        cursor.execute(sql, values)
+    except Exception as e:
+        print(f"Database error for app_id {app_id}: {e}")
+        conn.rollback()
+
+    return
+
+
+def store_game_reviews_in_db(new_ids_only: bool, app_id: str):
     """
     Scrapes review data from the Steam store for every app_id obtained from the database.
     It retrieves:
@@ -330,8 +371,8 @@ def store_game_reviews_in_db(new_ids_only):
 
     try:
         cursor.execute(query)
-        app_ids = cursor.fetchall()
-        print(f"Found {len(app_ids)} app_ids to process.")
+        all_app_ids = cursor.fetchall()
+        print(f"Found {len(all_app_ids)} app_ids to process.")
     except Exception as e:
         print(f"Error fetching app_ids from database: {e}")
         return
@@ -364,7 +405,7 @@ def store_game_reviews_in_db(new_ids_only):
     # Commit to db every 200
     batch_size = 200
 
-    for i, app in enumerate(app_ids, start=1):
+    for i, app in enumerate(all_app_ids, start=1):
         app_id = app[0]
 
         if not str(app_id).isdigit():
@@ -383,43 +424,8 @@ def store_game_reviews_in_db(new_ids_only):
             continue
 
         soup = BeautifulSoup(response.content, 'html.parser')
-        positive_input = soup.find("input", id="review_summary_num_positive_reviews")
-        total_input = soup.find("input", id="review_summary_num_reviews")
-
-        # Check if the page indicates that there are no reviews yet.
-        if positive_input is None or total_input is None:
-            no_reviews_div = soup.find("div", class_="noReviewsYetTitle")
-            if no_reviews_div is not None:
-                positive = 0
-                total = 0
-                negative = 0
-            else:
-                print(f"Missing review elements for app_id {app_id} and no 'noReviewsYetTitle' div found. Skipping.")
-                continue
-        else:
-            try:
-                positive = int(positive_input.get("value", 0))
-                total = int(total_input.get("value", 0))
-            except ValueError as ve:
-                print(f"Error converting review numbers for app_id {app_id}: {ve}")
-                continue
-            negative = total - positive
-
-        # Update or insert review data
-        try:
-            sql = """
-            INSERT INTO steam_game_reviews (app_id, positive, negative, total)
-            VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                positive = VALUES(positive),
-                negative = VALUES(negative),
-                total = VALUES(total)
-            """
-            values = (app_id, positive, negative, total)
-            cursor.execute(sql, values)
-        except Exception as e:
-            print(f"Database error for app_id {app_id}: {e}")
-            conn.rollback()
+        
+        scrape_reviews(soup, app_id)
 
         # Batch commits
         if i % batch_size == 0:
