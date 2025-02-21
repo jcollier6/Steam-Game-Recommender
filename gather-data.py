@@ -3,8 +3,10 @@ import json
 import time
 from datetime import datetime
 import requests
-from bs4 import BeautifulSoup
 import mysql.connector
+from requests_html import AsyncHTMLSession
+import asyncio
+
 
 # ---- MySQL CONNECTION ----
 conn = mysql.connector.connect(
@@ -306,13 +308,18 @@ def store_game_tags_in_db(new_ids_only: bool):
 
     conn.commit()
 
-def scrape_reviews(soup: BeautifulSoup, app_id: str):
-    positive_input = soup.find("input", id="review_summary_num_positive_reviews")
-    total_input = soup.find("input", id="review_summary_num_reviews")
+async def scrape_reviews(url: str, app_id: str):
+    asession = AsyncHTMLSession()
+    try:
+        r = await asession.get(url)
+    except Exception as e:
+        print(f"Error fetching URL for app_id {app_id}: {e}")
+        return
 
-    # Check if the page indicates that there are no reviews yet.
+    positive_input = r.html.find("input#review_summary_num_positive_reviews", first=True)
+    total_input = r.html.find("input#review_summary_num_reviews", first=True)
     if positive_input is None or total_input is None:
-        no_reviews_div = soup.find("div", class_="noReviewsYetTitle")
+        no_reviews_div = r.html.find("div.noReviewsYetTitle", first=True)
         if no_reviews_div is not None:
             positive = 0
             total = 0
@@ -322,8 +329,8 @@ def scrape_reviews(soup: BeautifulSoup, app_id: str):
             return
     else:
         try:
-            positive = int(positive_input.get("value", 0))
-            total = int(total_input.get("value", 0))
+            positive = int(positive_input.attrs.get("value", "0"))
+            total = int(total_input.attrs.get("value", "0"))
         except ValueError as ve:
             print(f"Error converting review numbers for app_id {app_id}: {ve}")
             return
@@ -345,43 +352,72 @@ def scrape_reviews(soup: BeautifulSoup, app_id: str):
         print(f"Database error for app_id {app_id}: {e}")
         conn.rollback()
 
-    return
 
+async def process_reviews(response, app_id: str):
+    positive_input = response.html.find("input#review_summary_num_positive_reviews", first=True)
+    total_input = response.html.find("input#review_summary_num_reviews", first=True)
 
-def store_game_reviews_in_db(new_ids_only: bool, app_id: str):
-    """
-    Scrapes review data from the Steam store for every app_id obtained from the database.
-    It retrieves:
-      - <input type="hidden" id="review_summary_num_positive_reviews" value="...">
-      - <input type="hidden" id="review_summary_num_reviews" value="...">
-      
-    It then calculates negative reviews (total - positive) and updates the data in the steam_game_reviews table. The function processes app_ids in batches before commiting to steam_game_reviews.
-    
-    Parameters:
-      new_ids_only (bool): If True, process only app_ids not in steam_game_tags. Otherwise, process all app_ids from steam_game_details.
-    """
-    # Build query to fetch app_ids
-    if new_ids_only:
-        query = """
-        SELECT app_id FROM steam_game_details 
-        WHERE app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_reviews)
-        """
+    if positive_input is None or total_input is None:
+        no_reviews_div = response.html.find("div.noReviewsYetTitle", first=True)
+        if no_reviews_div:
+            positive, total, negative = 0, 0, 0
+        else:
+            print(f"Missing review elements for app_id {app_id} and no 'noReviewsYetTitle' div found. Skipping reviews.")
+            return
     else:
-        query = "SELECT app_id FROM steam_game_details"
+        try:
+            positive = int(positive_input.attrs.get("value", "0"))
+            total = int(total_input.attrs.get("value", "0"))
+        except ValueError as ve:
+            print(f"Error converting review numbers for app_id {app_id}: {ve}")
+            return
+        negative = total - positive
 
     try:
-        cursor.execute(query)
-        all_app_ids = cursor.fetchall()
-        print(f"Found {len(all_app_ids)} app_ids to process.")
+        sql = """
+        INSERT INTO steam_game_reviews (app_id, positive, negative, total)
+        VALUES (%s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            positive = VALUES(positive),
+            negative = VALUES(negative),
+            total = VALUES(total)
+        """
+        values = (app_id, positive, negative, total)
+        cursor.execute(sql, values)
     except Exception as e:
-        print(f"Error fetching app_ids from database: {e}")
+        print(f"Database error for app_id {app_id} reviews: {e}")
+        conn.rollback()
+
+async def process_tags(response, app_id: str):
+    tags_elements = response.html.find("a.app_tag")
+    if not tags_elements:
+        print(f"No tags found for app_id {app_id}. Skipping tags.")
+        return
+    try:
+        tags = [el.text for el in tags_elements]
+    except Exception as e:
+        print(f"Error extracting tags for app_id {app_id}: {e}")
         return
 
-    # Headers to mimic a real U.S.-based browser session
+    try:
+        sql = """
+        INSERT INTO steam_game_tags (app_id, tag)
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE
+            tag = VALUES(tag)
+        """
+        for tag in tags:
+            values = (app_id, tag)
+            cursor.execute(sql, values)
+    except Exception as e:
+        print(f"Database error for app_id {app_id} tags: {e}")
+        conn.rollback()
+
+async def process_app(asession: AsyncHTMLSession, app_id: str, semaphore):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/105.0.5195.102 Safari/537.36",
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/105.0.5195.102 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://store.steampowered.com/",
@@ -398,56 +434,79 @@ def store_game_reviews_in_db(new_ids_only: bool, app_id: str):
         "Steam_Language": "english",
         "country": "US",
         "wants_mature_content": "1",
-        "birthtime": "631152000",       # Unix timestamp (e.g., Jan 1, 1990)
-        "lastagecheckage": "1-0-1990"     # Corresponding age check value
+        "birthtime": "631152000",       # Unix timestamp for Jan 1, 1990
+        "lastagecheckage": "1-0-1990"
     }
 
-    # Commit to db every 200
-    batch_size = 200
+    url = f"https://store.steampowered.com/app/{app_id}"
+    try:
+        async with semaphore:
+            response = await asession.get(url, headers=headers, cookies=cookies, timeout=10)
+    except Exception as e:
+        print(f"Error fetching URL for app_id {app_id}: {e}")
+        return
 
-    for i, app in enumerate(all_app_ids, start=1):
-        app_id = app[0]
+    # Use the single response to scrape both reviews and tags concurrently.
+    await asyncio.gather(
+        process_reviews(response, app_id),
+        process_tags(response, app_id)
+    )
 
+async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
+    max_concurrency = 50      # Limit concurrent HTTP requests
+    batch_size = 200          # Commit to DB every 200 processed games
+    semaphore = asyncio.Semaphore(max_concurrency)
+
+    if new_ids_only:
+        query = """
+        SELECT app_id FROM steam_game_details 
+        WHERE app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_reviews)
+        """
+    else:
+        query = "SELECT app_id FROM steam_game_details"
+
+    try:
+        cursor.execute(query)
+        all_app_ids = cursor.fetchall()
+        print(f"Found {len(all_app_ids)} app_ids to process.")
+    except Exception as e:
+        print(f"Error fetching app_ids from database: {e}")
+        return
+    
+    asession = AsyncHTMLSession()
+    tasks = []
+    for i, (app_id,) in enumerate(all_app_ids, start=1):
         if not str(app_id).isdigit():
-            print(f"{app_id} appid contains non digits. Skipping.")
+            print(f"{app_id} app_id is not numeric. Skipping.")
             continue
 
-        if i % 50 == 0:
-            print(f"Scraped {i} games review counts so far...")
+        tasks.append(process_app(asession, app_id, semaphore))
 
-        url = f"https://store.steampowered.com/app/{app_id}"
-        try:
-            response = requests.get(url, headers=headers, cookies=cookies, timeout=10)
-            response.raise_for_status()
-        except Exception as e:
-            print(f"Error fetching URL for app_id {app_id}: {e}")
-            continue
-
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        scrape_reviews(soup, app_id)
-
-        # Batch commits
         if i % batch_size == 0:
+            await asyncio.gather(*tasks)
+            tasks.clear()
             try:
                 conn.commit()
             except Exception as e:
-                print(f"Commit error: {e}")
+                print(f"Commit error after batch {i}: {e}")
                 conn.rollback()
+            print(f"Scraped {i} games so far...")
 
-            
-    # Final commit for any remaining records
-    try:
-        conn.commit()
-    except Exception as e:
-        print(f"Final commit error: {e}")
-        conn.rollback()
+    if tasks:
+        await asyncio.gather(*tasks)
+        try:
+            conn.commit()
+        except Exception as e:
+            print(f"Final commit error: {e}")
+            conn.rollback()
+
+    print("All app_ids processed and committed.")
 
  
 
 def main():
     parser = argparse.ArgumentParser(description="Gather Steam Store data.")
-    parser.add_argument("--type", choices=["all-ids", "gather-all-games-info", "gather-new-games-info", "gather-all-games-tags", "gather-new-games-tags", "gather-all-games-reviews", "gather-new-games-reviews"], help="Gather and store game data from Steam API")
+    parser.add_argument("--type", choices=["all-ids", "gather-all-games-info", "gather-new-games-info", "gather-all-games-tags", "gather-new-games-tags", "gather-all-games-reviews-and-tags", "gather-new-games-reviews-and-tags"], help="Gather and store game data from Steam API")
     args = parser.parse_args()
 
     API_KEY = ""
@@ -467,12 +526,12 @@ def main():
         store_game_tags_in_db(False)
     elif args.type == "gather-new-games-tags":
         store_game_tags_in_db(True)
-    elif args.type == "gather-all-games-reviews":
-        store_game_reviews_in_db(False)
-    elif args.type == "gather-new-games-reviews":
-        store_game_reviews_in_db(True)
+    elif args.type == "gather-all-games-reviews-and-tags":
+        asyncio.run(store_game_reviews_and_tags_in_db(False))
+    elif args.type == "gather-new-games-reviews-and-tags":
+        asyncio.run(store_game_reviews_and_tags_in_db(True))
     else:
-        print("Please use --type all-ids or --type gather-new-games-info or --type gather-all-games-info or --type gather-all-games-tags or --type gather-new-games-tags or  --type gather-all-games-reviews or --type gather-new-games-reviews")
+        print("Please use --type all-ids or --type gather-new-games-info or --type gather-all-games-info or --type gather-all-games-tags or --type gather-new-games-tags or  --type gather-all-games-reviews-and-tags or --type gather-new-games-reviews-and-tags")
 
     cursor.close()
     conn.close()
