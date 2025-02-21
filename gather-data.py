@@ -421,7 +421,6 @@ async def process_app(asession: AsyncHTMLSession, app_id: str, semaphore):
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://store.steampowered.com/",
-        "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-Mode": "navigate",
@@ -453,14 +452,15 @@ async def process_app(asession: AsyncHTMLSession, app_id: str, semaphore):
     )
 
 async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
-    max_concurrency = 50      # Limit concurrent HTTP requests
+    max_concurrency = 10      # Limit concurrent HTTP requests
     batch_size = 200          # Commit to DB every 200 processed games
     semaphore = asyncio.Semaphore(max_concurrency)
 
     if new_ids_only:
         query = """
-        SELECT app_id FROM steam_game_details 
-        WHERE app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_reviews)
+            SELECT app_id FROM steam_game_details 
+            WHERE app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_reviews)
+            OR app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_tags)
         """
     else:
         query = "SELECT app_id FROM steam_game_details"
