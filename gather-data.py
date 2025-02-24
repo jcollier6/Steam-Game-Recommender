@@ -88,11 +88,16 @@ def store_game_details_in_db(new_ids_only: bool):
             query = """
             SELECT a.app_id
             FROM all_steam_game_ids a
-            LEFT JOIN steam_game_details s ON a.app_id = s.app_id
-            WHERE s.app_id IS NULL
+            LEFT JOIN steam_game_details d ON a.app_id = d.app_id
+            LEFT JOIN steam_game_genres g ON a.app_id = g.app_id
+            LEFT JOIN steam_game_categories c ON a.app_id = c.app_id
+            WHERE d.app_id IS NULL
+            OR g.app_id IS NULL
+            OR c.app_id IS NULL
             """
         else:
             query = "SELECT app_id FROM all_steam_game_ids"
+
 
         cursor.execute(query)
         rows = cursor.fetchall() 
@@ -158,19 +163,42 @@ def store_game_details_in_db(new_ids_only: bool):
         name = details.get("name", "")
         is_free = 1 if details.get("is_free", False) else 0
 
+        # Extract price
+        price_overview = details.get("price_overview", {})
+        price_formatted = price_overview.get("final_formatted", "")
+
+        if price_formatted and price_formatted.endswith("USD"):
+            # Remove the trailing "USD" and any trailing whitespace
+            price_usd = price_formatted[:-3].strip()
+        else:
+            price_usd = price_formatted or ""
+
         # Extract release_date info
         release_date_info = details.get("release_date", {})
         coming_soon = 1 if release_date_info.get("coming_soon", False) else 0
         
         # Parse the "Jul 9, 2013" style date
         raw_date_str = release_date_info.get("date", "")
-        release_date_date = None
+        release_date = None
         if raw_date_str:
             try:
-                release_date_date = datetime.strptime(raw_date_str, "%b %d, %Y").date()
+                release_date = datetime.strptime(raw_date_str, "%b %d, %Y").date()
             except ValueError:
                 pass
 
+        # Extract images
+        header_image = details.get("header_image", "")
+
+        screenshots = details.get("screenshots", [])
+
+        # Extract up to 4 screenshot URLs (path_full). If fewer exist or "screenshots" is missing, use an empty string.
+        screenshot1 = screenshots[0].get("path_full", "") if len(screenshots) > 0 else ""
+        screenshot2 = screenshots[1].get("path_full", "") if len(screenshots) > 1 else ""
+        screenshot3 = screenshots[2].get("path_full", "") if len(screenshots) > 2 else ""
+        screenshot4 = screenshots[3].get("path_full", "") if len(screenshots) > 3 else ""
+
+
+        # Extract recommendations
         rec_data = details.get("recommendations", {})
         recommendations_count = rec_data.get("total", 0)
 
@@ -181,29 +209,47 @@ def store_game_details_in_db(new_ids_only: bool):
             app_id,
             name,
             coming_soon,
-            release_date_date,
+            release_date,
             is_free,
+            price_usd,
             recommendations,
-            raw_json
+            raw_json,
+            header_image,
+            screenshot1,
+            screenshot2,
+            screenshot3,
+            screenshot4
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             name = VALUES(name),
             coming_soon = VALUES(coming_soon),
-            release_date_date = VALUES(release_date_date),
+            release_date = VALUES(release_date),
             is_free = VALUES(is_free),
+            price_usd = VALUES(price_usd),
             recommendations = VALUES(recommendations),
             raw_json = VALUES(raw_json),
-            fetched_at = CURRENT_TIMESTAMP
+            fetched_at = CURRENT_TIMESTAMP,
+            header_image = VALUES(header_image),
+            screenshot1 = VALUES(screenshot1),
+            screenshot2 = VALUES(screenshot2),
+            screenshot3 = VALUES(screenshot3),
+            screenshot4 = VALUES(screenshot4)
         """
         vals = (
             app_id,
             name,
             coming_soon,
-            release_date_date,  
+            release_date,  
             is_free,
+            price_usd,
             recommendations_count,
-            raw_data_json
+            raw_data_json,
+            header_image,
+            screenshot1,
+            screenshot2,
+            screenshot3,
+            screenshot4
         )
 
         try:
@@ -228,6 +274,8 @@ def store_game_details_in_db(new_ids_only: bool):
                 VALUES (%s, %s)
                 """
                 cursor.execute(cat_insert_sql, (app_id, cat_name))
+            else:
+                print("No categories found for ", app_id)
 
         # Insert genres
         genres = details.get("genres", [])
@@ -239,118 +287,14 @@ def store_game_details_in_db(new_ids_only: bool):
                 VALUES (%s, %s)
                 """
                 cursor.execute(gen_insert_sql, (app_id, gen_name))
+            else:
+                print("No genres found for ", app_id)
 
     if batch_counter > 0:
         conn.commit()
         batch_counter = 0
 
     print("Finished storing all game details into the database.")
-
-
-
-def store_game_tags_in_db(new_ids_only: bool):
-    print("Now running with new_ids_only =", new_ids_only)
-    """
-    Store game tags in the database. Optionally fetch only missing app_ids.
-    Parameters:
-        new_ids_only (bool): If True, only fetch app_ids that are in 'steam_game_details' but not in 'steam_game_tags'.
-    """
-    if new_ids_only:
-        query = """
-        SELECT app_id FROM steam_game_details 
-        WHERE app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_tags)
-        """
-    else:
-        query = "SELECT app_id FROM steam_game_details"
-
-    cursor.execute(query)
-    app_ids = cursor.fetchall()
-
-    base_url = "https://steamspy.com/api.php?request=appdetails&appid={}"
-
-    commit_interval = 200
-    processed_count = 0
-
-    for (app_id,) in app_ids:
-        try:
-            response = requests.get(base_url.format(app_id))
-            response.raise_for_status()
-            data = response.json()
-            tags = data.get("tags", {})
-
-            if tags:
-                for tag in tags:
-                    upsert_query = """
-                    INSERT INTO steam_game_tags (app_id, tag) 
-                    VALUES (%s, %s) 
-                    ON DUPLICATE KEY UPDATE tag=VALUES(tag)
-                    """
-                    cursor.execute(upsert_query, (app_id, tag))
-            else:
-                # Insert a placeholder to mark that this game has been processed
-                placeholder_query = """
-                INSERT INTO steam_game_tags (app_id, tag)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE tag=VALUES(tag)
-                """
-                cursor.execute(placeholder_query, (app_id, "no_tags"))
-
-            processed_count += 1
-
-            if processed_count % commit_interval == 0:
-                conn.commit()
-                print(f"Processed {processed_count} games tags so far...")
-
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching data for app_id {app_id}: {e}")
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON for app_id {app_id}: {e}")
-
-    conn.commit()
-
-async def scrape_reviews(url: str, app_id: str):
-    asession = AsyncHTMLSession()
-    try:
-        r = await asession.get(url)
-    except Exception as e:
-        print(f"Error fetching URL for app_id {app_id}: {e}")
-        return
-
-    positive_input = r.html.find("input#review_summary_num_positive_reviews", first=True)
-    total_input = r.html.find("input#review_summary_num_reviews", first=True)
-    if positive_input is None or total_input is None:
-        no_reviews_div = r.html.find("div.noReviewsYetTitle", first=True)
-        if no_reviews_div is not None:
-            positive = 0
-            total = 0
-            negative = 0
-        else:
-            print(f"Missing review elements for app_id {app_id} and no 'noReviewsYetTitle' div found. Skipping.")
-            return
-    else:
-        try:
-            positive = int(positive_input.attrs.get("value", "0"))
-            total = int(total_input.attrs.get("value", "0"))
-        except ValueError as ve:
-            print(f"Error converting review numbers for app_id {app_id}: {ve}")
-            return
-        negative = total - positive
-
-    # Update or insert review data
-    try:
-        sql = """
-        INSERT INTO steam_game_reviews (app_id, positive, negative, total)
-        VALUES (%s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            positive = VALUES(positive),
-            negative = VALUES(negative),
-            total = VALUES(total)
-        """
-        values = (app_id, positive, negative, total)
-        cursor.execute(sql, values)
-    except Exception as e:
-        print(f"Database error for app_id {app_id}: {e}")
-        conn.rollback()
 
 
 async def process_reviews(response, app_id: str):
@@ -522,10 +466,6 @@ def main():
         store_game_details_in_db(False)
     elif args.type == "gather-new-games-info":
         store_game_details_in_db(True)
-    elif args.type == "gather-all-games-tags":
-        store_game_tags_in_db(False)
-    elif args.type == "gather-new-games-tags":
-        store_game_tags_in_db(True)
     elif args.type == "gather-all-games-reviews-and-tags":
         asyncio.run(store_game_reviews_and_tags_in_db(False))
     elif args.type == "gather-new-games-reviews-and-tags":
