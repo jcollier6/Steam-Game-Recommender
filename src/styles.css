@@ -12,12 +12,13 @@ router-outlet + * {
     --font-size-standard: 0.75rem;
     --font-size-large: 1rem;
     --font-size-xlarge: 1.5rem;
-    --font-size-title: clamp(1.5rem, 2.5vw, 2.5rem);
+    --font-size-title: clamp(1.3rem, 4vw, 2.5rem);
     --font-size-h1: clamp(var(--font-size-standard), 1.5vw, var(--font-size-xlarge));
 
     --primary-color: #0E1724;
     --secondary-color: #19212E;
     --accent-color: #596beb;
+    --shadow-color: #0000003f;
     --border-radius: 14px;
 }
 html, body {

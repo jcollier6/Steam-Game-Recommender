@@ -5,12 +5,12 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  text-wrap: nowrap;
+  overflow-y: auto;
 }
 .sign-in-text {
   text-align: center;
   font-size: var(--font-size-title);
-  margin-bottom: 4rem;
+  margin-bottom: 4vh;
 }
 .content-holder {
   display: flex;
@@ -18,7 +18,7 @@
   justify-content: start;
   align-items: start;
   height: 20vh;
-  width: clamp(14rem, 20vw, 24rem);
+  width: clamp(14rem, 40vw, 20rem);
 }
 .steamid-holder {
   font-size: var(--font-size-large);
@@ -35,7 +35,9 @@
   text-align: center;
   width: 100%;
 }
-
+.help-link:hover {
+  color: var(--accent-color)
+}
 input {
   border: 2px solid #303348;
   font-size: var(--font-size-large);
@@ -59,7 +61,7 @@ button:hover {
 }
 button:disabled {
   background-color: #303348;
-  cursor: not-allowed;
+  cursor: default;
   border: none;
 }
 a {

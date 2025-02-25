@@ -9,11 +9,12 @@
   height: 50px;
   font-size: var(--font-size-standard);
   text-wrap: nowrap;
+  color: rgb(128, 145, 162);
 }
 .link {
   padding-left: 0.2rem;
   padding-right: 0.2rem;
-  color: white;
+  color: rgb(128, 145, 162)
 }
 .link:hover {
   color: var(--accent-color)
@@ -24,6 +25,7 @@
   padding-left: 0.2rem;
   font-size: var(--font-size-standard);
   background-color: transparent;
+  color: rgb(128, 145, 162)
 }
 .about-button:hover {
   text-decoration: underline;

@@ -1,3 +1,14 @@
+@media (max-width: 500px) {
+    .logo {
+        transform: scale(0.7);
+        padding: 0 !important;
+    }
+    .nav-button-holder {
+        gap: 0.5rem !important;
+        padding: 0.5rem !important;
+    }
+}
+
 .nav-bar {
     overflow: hidden;
     height: 5rem;
@@ -8,8 +19,8 @@
 .logo {
     padding-left: 1rem;
     padding-right: 1rem;
-    -webkit-filter: drop-shadow(3px 3px 4px #0000003f);
-    filter: drop-shadow(3px 3px 4px #0000003f);
+    -webkit-filter: drop-shadow(3px 3px 4px var(--shadow-color));
+    filter: drop-shadow(3px 3px 4px var(--shadow-color));
 }
 .text-steam-recommender {
     text-wrap: nowrap;
@@ -27,9 +38,9 @@
 button {
     border-radius: var(--border-radius);
     background: var(--accent-color);
-    width: clamp(3rem, 8vw, 4.5rem);
-    height: 2.5rem;
-    box-shadow: 3px 3px 4px 0px #0000003f;
+    width: clamp(2.6rem, 8vw, 4.5rem);
+    height: clamp(2rem, 4vw, 2.5rem);
+    box-shadow: 3px 3px 4px 0px var(--shadow-color);
     font-size: clamp(var(--font-size-standard), 2vw, var(--font-size-large));
     font-weight: bold;
     text-wrap: nowrap;

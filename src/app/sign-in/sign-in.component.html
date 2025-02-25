@@ -1,4 +1,3 @@
-
 <div class="page-layout">
     <span class="sign-in-text">
         Enter A Steam ID For <br>Personalized Recommendations
@@ -17,10 +16,11 @@
                     [(ngModel)]="steamId"
                     placeholder="Enter ID"
                     required
+                    pattern="^[0-9]+$"
                 />
 
                 <!-- Show error message if input is invalid -->
-                <span *ngIf="isInvalid" class="error-text">
+                <span *ngIf="!steamIdForm.valid && steamIdForm.dirty && steamIdForm.controls['steamId']?.value" class="error-text">
                     ID must contain only numbers!
                 </span>
             </div>
@@ -35,7 +35,7 @@
         </form>
 
         <div class="link-holder">
-            <a href="https://help.steampowered.com/en/faqs/view/2816-BE67-5B69-0FEC" target="_blank">Don't know your ID?</a>
+            <a class="help-link" href="https://help.steampowered.com/en/faqs/view/2816-BE67-5B69-0FEC" target="_blank">Don't know your ID?</a>
         </div>
     </div>
 </div>
