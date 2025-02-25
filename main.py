@@ -12,14 +12,6 @@ from pydantic import BaseModel
 ### database setup
 app = FastAPI()
 
-conn = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    passwd="testpassword1",
-    database="mydb"
-)
-cursor = conn.cursor()
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,12 +20,33 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# --- Database Connection Helpers ---
+def get_db_connection():
+    """Return a new MySQL connection from the pool."""
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        passwd="testpassword1",
+        database="mydb",
+        pool_name="mypool",
+        pool_size=5
+    )
+
+def query_db(query, params=None, dictionary=True):
+    """Run a query and return all results. Automatically opens and closes a connection."""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=dictionary)
+    cursor.execute(query, params or ())
+    result = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return result
+
+
 
 @app.get("/get_tags")
 def get_tags():
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM steam_game_tags")
-    records = cursor.fetchall()
+    records = query_db("SELECT * FROM steam_game_tags")
     return records
 
 @app.get("/recommended_games")
@@ -56,7 +69,7 @@ def get_recently_played():
 
 
 
-### wait on front end to send steam id
+# --- Steam ID Request ---
 class SteamIdRequest(BaseModel):
     steamId: str
 
@@ -73,13 +86,11 @@ async def submit_steam_id(request: SteamIdRequest):
     
 async def process_steam_id(steam_id: str):
     print(f"Processing Steam ID: {steam_id}")
-
     try:
         get_API_key()  
         user_data = is_valid_id(steam_id) 
         prepare_user_info(user_data)  
         calculate_recommended_games()  
-
         print(f"Steam ID {steam_id} processing complete!")
         return {"status": "success", "message": f"Processed {steam_id}"}
 
@@ -89,8 +100,7 @@ async def process_steam_id(steam_id: str):
 
 
 
-### recommendation calculation
-
+# --- Global Variables for Recommendations ---
 user_game_scores = dict()
 candidate_app_ids = set()
 app_id_to_tags = dict()
@@ -99,26 +109,22 @@ df_user_owns = pd.DataFrame()
 API_KEY = ""
 steam_id = None 
 
-# Fetch game details from MySQL and load it into a DataFrame
-cursor.execute("""
-    SELECT app_id, name, coming_soon, release_date, is_free, price_usd, header_image, screenshot1, screenshot2, screenshot3, screenshot4 
+# Initialize global DataFrames using connection pooling
+metadata = query_db("""
+    SELECT app_id, name, coming_soon, release_date, is_free, price_usd, 
+           header_image, screenshot1, screenshot2, screenshot3, screenshot4 
     FROM steam_game_details;
 """)
-metadata = cursor.fetchall()
-
-# Convert data to DataFrame
-columns = [col[0] for col in cursor.description] 
-df_game_metadata = pd.DataFrame(metadata, columns=columns)
+df_game_metadata = pd.DataFrame(metadata)
 df_game_metadata["app_id"] = df_game_metadata["app_id"].astype(str)
 df_game_metadata["name"] = df_game_metadata["name"].astype(str)
 
-# Fetch game reviews from MySQL and load it into a DataFrame
-cursor.execute("SELECT app_id, bayesian_score FROM steam_game_reviews;")
-df_review_data = pd.DataFrame(cursor.fetchall(), columns=["app_id", "bayesian_score"])
+review_data = query_db("SELECT app_id, bayesian_score FROM steam_game_reviews;")
+df_review_data = pd.DataFrame(review_data)
 df_review_data["app_id"] = df_review_data["app_id"].astype(str)
 df_review_data["bayesian_score"] = df_review_data["bayesian_score"].astype(float)
 
-
+# --- Helper Functions ---
 def get_API_key():
     try:
         with open('./environment.txt', "r") as file:
@@ -139,10 +145,8 @@ def is_valid_id(steam_id):
     try:
         response = requests.get(API_URL, params=params)
         response.raise_for_status()  
-        
         user_data = response.json()
         return user_data
-
     except requests.exceptions.HTTPError as http_err:
         if response.status_code == 400:
             raise ValueError(f"Invalid Steam ID: {steam_id}")
@@ -209,7 +213,7 @@ def prepare_user_info(user_data):
                 user_tag_counts[tag] += weighted_playtime
 
     global user_game_scores
-    user_game_scores = dict(user_tag_counts) # dict {tag: weighted_score}
+    user_game_scores = dict(user_tag_counts)
 
     all_app_ids = set(app_id_to_tags.keys())
     global candidate_app_ids
@@ -238,6 +242,8 @@ def calculate_recommended_games():
 
 
 def recommended_games_additional_info():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
     updated_games = []
 
     for index, game in recommended_games.iterrows():
@@ -276,5 +282,6 @@ def recommended_games_additional_info():
             "header_image": header_image,
             "screenshots": screenshots 
         })
-
+    cursor.close()
+    conn.close()
     return updated_games
