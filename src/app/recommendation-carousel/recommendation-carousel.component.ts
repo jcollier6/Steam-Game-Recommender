@@ -1,6 +1,7 @@
 import { Component, ElementRef, ViewChild, Renderer2 } from '@angular/core';
 import { GameService, Recommended_Game } from '../services/game.service';
 import { CommonModule } from '@angular/common';
+import { trigger, state, style, animate, transition } from '@angular/animations';
 
 
 @Component({
@@ -9,9 +10,25 @@ import { CommonModule } from '@angular/common';
   imports: [ CommonModule ],
   providers: [ GameService ],
   templateUrl: './recommendation-carousel.component.html',
-  styleUrl: './recommendation-carousel.component.css'
+  styleUrl: './recommendation-carousel.component.css',
+  animations: [
+    trigger('fadeAnimation', [
+      state('visible', style({ 
+        opacity: 1,
+        filter: 'blur(0px)'
+      })),
+      state('hidden', style({ 
+        opacity: 0,
+        filter: 'blur(2px)' 
+      })),
+      transition('visible => hidden', animate('100ms ease-out')),
+      transition('hidden => visible', animate('100ms ease-in'))
+    ])
+    
+  ]
 })
 export class RecommendationCarouselComponent {
+  fadeState: 'visible' | 'hidden' = 'visible';
   recommendedGames: Recommended_Game[] = [];
   recommendedGameListExist = false;
   currentIndex = 0;
@@ -65,12 +82,17 @@ export class RecommendationCarouselComponent {
   }
   
   changeGame(direction: 'next' | 'previous'): void {
-    if (direction === 'next') {
-      this.currentIndex = (this.currentIndex + 1) % this.recommendedGames.length;
-    } else if (direction === 'previous') {
-      this.currentIndex = (this.currentIndex - 1 + this.recommendedGames.length) % this.recommendedGames.length;
-    }
-    this.updateCurrentGame();
+    this.fadeState = 'hidden';
+    // Wait for the fade-out animation to complete
+    setTimeout(() => {
+      if (direction === 'next') {
+        this.currentIndex = (this.currentIndex + 1) % this.recommendedGames.length;
+      } else if (direction === 'previous') {
+        this.currentIndex = (this.currentIndex - 1 + this.recommendedGames.length) % this.recommendedGames.length;
+      }
+      this.updateCurrentGame();
+      this.fadeState = 'visible';
+    }, 100);
   }
   
 

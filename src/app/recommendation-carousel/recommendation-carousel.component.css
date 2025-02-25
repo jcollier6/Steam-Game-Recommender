@@ -76,6 +76,7 @@
     height: 80%;
     background-color: var(--secondary-color);
     border-radius: var(--border-radius);
+    box-shadow: 4px 4px 4px 4px var(--box-shadow-color)
 }
 .recommended-games-holder button {
     width: 4%;
