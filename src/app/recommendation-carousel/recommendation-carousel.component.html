@@ -12,18 +12,16 @@
         </button>
 
         <div class="recommended-games">
-            <img class="game-thumbnail" 
-                src="../../assets/No-Image-Available.png"
-            />
+            <img class="game-header_image" [src]="header_image" />
 
             <div class="game-info-holder">
                 <span class="game-title">{{ currentGame['name'] }}</span>
                 <div class="screenshots-holder">
-                    <div class="screenshot"></div>
-                    <div class="screenshot"></div>
-                    <div class="screenshot"></div>
-                    <div class="screenshot"></div>
-                </div>
+                    <div class="screenshot" 
+                         *ngFor="let image of screenshots; let i = index"
+                         [ngStyle]="{'background-image': 'url(' + (image || '../../assets/No-Image-Available.png') + ')'}">
+                    </div>
+                </div>                  
                 <span class="recommendation-justification">
                     <span class="recommended-word">Recommended</span> because you played games tagged with
                 </span>                  
@@ -34,7 +32,7 @@
                     </ng-template>
                 </div>
                   
-                <span class="price">Price</span>
+                <span class="price">{{ price }}</span>
             </div>
         </div>
 

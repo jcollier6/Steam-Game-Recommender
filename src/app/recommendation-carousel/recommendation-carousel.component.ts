@@ -18,12 +18,15 @@ export class RecommendationCarouselComponent {
   currentGame: Recommended_Game = {
     app_id: '',
     name: '',
-    price: 0,
+    is_free: false,
+    price_usd: 0,
     tags: [],
-    thumbnail: '',
+    header_image: '',
     screenshots: []
   };
-
+  header_image: string = '../../assets/No-Image-Available.png';
+  price: string = '';
+  screenshots: string[] = ["", "", "", ""];
 
   tags: string[] = ['Open World Survival Craft', 'PvE', 'Survival', 'Multiplayer', 'Co-op'];
   tagsExist: boolean = false;
@@ -55,6 +58,10 @@ export class RecommendationCarouselComponent {
     if (this.tagsExist) {
       this.renderTags(this.currentGame.tags);
     }
+
+    this.header_image = this.currentGame['header_image'] || '../../assets/No-Image-Available.png';
+    this.price = this.currentGame['is_free'] ? 'Free' : String(this.currentGame['price_usd'] || "");
+    this.screenshots = this.currentGame.screenshots.map(url => url || "");
   }
   
   changeGame(direction: 'next' | 'previous'): void {

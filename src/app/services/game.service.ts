@@ -5,9 +5,10 @@ import { Observable } from 'rxjs';
 export interface Recommended_Game {
   app_id: string;
   name: string;
-  price: number;
+  is_free: boolean;
+  price_usd: number;
   tags: string[];
-  thumbnail: string;
+  header_image: string;
   screenshots: string[];
 }
 

@@ -255,10 +255,15 @@ def recommended_games_additional_info():
             WHERE app_id = %s
         """, (app_id,))
         
-        image_data = cursor.fetchone()
+        additional_info = cursor.fetchone()
         
-        if image_data:
-            price_usd, header_image, screenshot1, screenshot2, screenshot3, screenshot4 = image_data
+        if additional_info:
+            price_usd = additional_info['price_usd']
+            header_image = additional_info['header_image']
+            screenshot1 = additional_info['screenshot1']
+            screenshot2 = additional_info['screenshot2']
+            screenshot3 = additional_info['screenshot3']
+            screenshot4 = additional_info['screenshot4']
             screenshots = [
                 screenshot1 if screenshot1 is not None else "",
                 screenshot2 if screenshot2 is not None else "",
@@ -276,9 +281,10 @@ def recommended_games_additional_info():
         updated_games.append({
             "app_id": game["app_id"],
             "name": game["name"],
+            "is_free": game["is_free"],
             "price_usd": price_usd,
             "tags": list(game_tags),
-            "thumbnail": game.get("thumbnail", ""),
+            "header_image": game.get("header_image", ""),
             "header_image": header_image,
             "screenshots": screenshots 
         })

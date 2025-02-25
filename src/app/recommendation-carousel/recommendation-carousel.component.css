@@ -73,7 +73,7 @@
 .recommended-games-holder {
     display: flex;
     width: 100%;
-    height: 90%;
+    height: 80%;
     background-color: var(--secondary-color);
     border-radius: var(--border-radius);
 }
@@ -88,18 +88,16 @@
 .recommended-games {
     display: flex;
 }
-.game-thumbnail {
+.game-header_image {
     width: 100%;
-    height: 100%;
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
+    height: auto;
+    object-fit: contain;
 }
 .game-info-holder {
     display: flex;
     flex-direction: column;
-    padding: 1vw;
+    padding: 0.75vw;
     width: 100%;
-    gap: 1vw;
     position: relative;
 }
 .game-title {
@@ -116,6 +114,7 @@
 }
 .screenshots-holder {
     display: grid;
+    padding-top: 1rem;
     grid-template-columns: repeat(2, 1fr); 
     grid-template-rows: repeat(2, 1fr);    
     gap: 0.5rem; 
@@ -126,13 +125,10 @@
     background-size: cover;
     background-position: center;
 }
-.screenshot:nth-child(1) { background-image: url('../../assets/No-Image-Available.png'); }
-.screenshot:nth-child(2) { background-image: url('../../assets/No-Image-Available.png'); }
-.screenshot:nth-child(3) { background-image: url('../../assets/No-Image-Available.png'); }
-.screenshot:nth-child(4) { background-image: url('../../assets/No-Image-Available.png'); }
-
 .recommendation-justification {
-    font-size: clamp(var(--font-size-small), 1vw, var(--font-size-large));
+    padding-top: 1rem;
+    padding-bottom: 0.5rem;
+    font-size: clamp(var(--font-size-small), 0.75vw, var(--font-size-large));
 }
 .recommended-word {
     color: var(--accent-color);
@@ -146,12 +142,13 @@
     overflow: hidden;
 }
 .tag {
-    font-size: clamp(var(--font-size-small), 0.75vw, var(--font-size-standard));
+    font-size: clamp(var(--font-size-small), 0.7vw, var(--font-size-standard));
     background-color: var(--accent-color);
     border-radius: var(--border-radius);
     padding: 0.2rem 0.5rem;
 }  
 .price {
+    padding-top: 1rem;
     font-size: clamp(var(--font-size-small), 1vw, var(--font-size-large));
     margin-top: auto;
     align-items: flex-start;
