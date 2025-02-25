@@ -134,12 +134,23 @@
 .recommendation-justification {
     font-size: clamp(var(--font-size-small), 1vw, var(--font-size-large));
 }
+.recommended-word {
+    color: var(--accent-color);
+    font-weight: 600;
+}
 .tags-holder {
-    height: fit-content;
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    max-height: calc(2 * (clamp(var(--font-size-small), 0.75vw, var(--font-size-standard)) + var(--border-radius)));
+    overflow: hidden;
 }
+.tag {
+    font-size: clamp(var(--font-size-small), 0.75vw, var(--font-size-standard));
+    background-color: var(--accent-color);
+    border-radius: var(--border-radius);
+    padding: 0.2rem 0.5rem;
+}  
 .price {
     font-size: clamp(var(--font-size-small), 1vw, var(--font-size-large));
     margin-top: auto;

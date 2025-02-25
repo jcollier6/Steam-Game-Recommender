@@ -18,6 +18,8 @@ conn = mysql.connector.connect(
     passwd="testpassword1",
     database="mydb"
 )
+cursor = conn.cursor()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,16 +28,6 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-@app.get("/")
-def root():
-    return {"message": "Hello World"}
-
-@app.get("/get_games")
-def get_games():
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM games")
-    records = cursor.fetchall()
-    return records
 
 @app.get("/get_tags")
 def get_tags():
@@ -44,24 +36,10 @@ def get_tags():
     records = cursor.fetchall()
     return records
 
-@app.get("/get_reviews")
-def get_reviews():
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM reviews")
-    records = cursor.fetchall()
-    return records
-
-@app.get("/get_users")
-def get_users():
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT user_id FROM user_data")
-    records = cursor.fetchall()
-    return records
-
 @app.get("/recommended_games")
 def get_recommended_games():
     try:
-        data = recommended_games[["app_id", "name", "overlap_score"]].to_dict(orient="records")
+        data = recommended_games_additional_info()
         return JSONResponse(content=data)  
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
@@ -69,7 +47,9 @@ def get_recommended_games():
 @app.get("/recently_played")
 def get_recently_played():
     try:
-        data = df_user_owns[df_user_owns["playtime_2weeks"]>0].to_dict(orient="records")
+        data = df_user_owns[df_user_owns["playtime_2weeks"] > 0][
+            ["name", "playtime_forever", "playtime_2weeks"]
+        ].to_dict(orient="records")
         return JSONResponse(content=data)  
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
@@ -119,10 +99,25 @@ df_user_owns = pd.DataFrame()
 API_KEY = ""
 steam_id = None 
 
-# prepare cleaned_games information to be merged with other game subsets
-df_metadata = pd.read_csv("cleaned_games.csv", escapechar='\\') 
-df_metadata["app_id"] = df_metadata["app_id"].astype(str)
-df_metadata["name"] = df_metadata["name"].astype(str)
+# Fetch game details from MySQL and load it into a DataFrame
+cursor.execute("""
+    SELECT app_id, name, coming_soon, release_date, is_free, price_usd, header_image, screenshot1, screenshot2, screenshot3, screenshot4 
+    FROM steam_game_details;
+""")
+metadata = cursor.fetchall()
+
+# Convert data to DataFrame
+columns = [col[0] for col in cursor.description] 
+df_game_metadata = pd.DataFrame(metadata, columns=columns)
+df_game_metadata["app_id"] = df_game_metadata["app_id"].astype(str)
+df_game_metadata["name"] = df_game_metadata["name"].astype(str)
+
+# Fetch game reviews from MySQL and load it into a DataFrame
+cursor.execute("SELECT app_id, bayesian_score FROM steam_game_reviews;")
+df_review_data = pd.DataFrame(cursor.fetchall(), columns=["app_id", "bayesian_score"])
+df_review_data["app_id"] = df_review_data["app_id"].astype(str)
+df_review_data["bayesian_score"] = df_review_data["bayesian_score"].astype(float)
+
 
 def get_API_key():
     try:
@@ -178,8 +173,8 @@ def prepare_user_info(user_data):
     df_user_owns["app_id"] = df_user_owns["app_id"].astype(str)
     df_steam_tags["app_id"] = df_steam_tags["app_id"].astype(str)
 
-    # Filter df_user_owns to remove games not in cleaned_games.csv
-    df_user_owns = df_user_owns[df_user_owns["app_id"].isin(df_metadata["app_id"])]
+    # Filter df_user_owns to remove games not known to my database
+    df_user_owns = df_user_owns[df_user_owns["app_id"].isin(df_game_metadata["app_id"])]
 
     df_app_tags = (
         df_steam_tags
@@ -202,7 +197,7 @@ def prepare_user_info(user_data):
     )
 
     # add additional game information to the owned games
-    df_user_owns = df_user_owns.merge(df_metadata, on="app_id", how="left")
+    df_user_owns = df_user_owns.merge(df_game_metadata, on="app_id", how="left")
 
     # collect all tags from the user's owned games and weight by weighted_playtime
     user_tag_counts = Counter()
@@ -229,13 +224,57 @@ def calculate_recommended_games():
         results.append((app_id, overlap_score))
 
     df_scores = pd.DataFrame(results, columns=["app_id", "overlap_score"])
-    df_scores = df_scores.merge(df_metadata[["app_id", "bayesian_score"]],
-                                on="app_id",
-                                how="left")
+    df_scores = df_scores.merge(
+        df_review_data[["app_id", "bayesian_score"]],
+        on="app_id",
+        how="inner")
     df_scores["final_score"] = df_scores["overlap_score"] * df_scores["bayesian_score"]
     df_scores.sort_values("final_score", ascending=False, inplace=True)
 
     df_scores.reset_index(drop=True, inplace=True)
 
     global recommended_games
-    recommended_games = df_scores.head(100).merge(df_metadata, on="app_id", how="left")
+    recommended_games = df_scores.head(10).merge(df_game_metadata, on="app_id", how="left")
+
+
+def recommended_games_additional_info():
+    updated_games = []
+
+    for index, game in recommended_games.iterrows():
+        app_id = game['app_id']
+        
+        cursor.execute("""
+            SELECT price_usd, header_image, screenshot1, screenshot2, screenshot3, screenshot4
+            FROM steam_game_details 
+            WHERE app_id = %s
+        """, (app_id,))
+        
+        image_data = cursor.fetchone()
+        
+        if image_data:
+            price_usd, header_image, screenshot1, screenshot2, screenshot3, screenshot4 = image_data
+            screenshots = [
+                screenshot1 if screenshot1 is not None else "",
+                screenshot2 if screenshot2 is not None else "",
+                screenshot3 if screenshot3 is not None else "",
+                screenshot4 if screenshot4 is not None else ""
+            ]
+            price_usd = price_usd if price_usd is not None else ""
+        else:
+            price_usd = ""
+            header_image = ""
+            screenshots = ["", "", "", ""]
+
+        game_tags = app_id_to_tags.get(game['app_id'], [])
+
+        updated_games.append({
+            "app_id": game["app_id"],
+            "name": game["name"],
+            "price_usd": price_usd,
+            "tags": list(game_tags),
+            "thumbnail": game.get("thumbnail", ""),
+            "header_image": header_image,
+            "screenshots": screenshots 
+        })
+
+    return updated_games

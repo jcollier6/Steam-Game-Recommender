@@ -5,7 +5,10 @@ import { Observable } from 'rxjs';
 export interface Recommended_Game {
   app_id: string;
   name: string;
-  overlap_score: number;
+  price: number;
+  tags: string[];
+  thumbnail: string;
+  screenshots: string[];
 }
 
 export interface Recent_Game {

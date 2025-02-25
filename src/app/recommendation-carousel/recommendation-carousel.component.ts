@@ -1,22 +1,71 @@
-import { Component, ElementRef, ViewChild, Renderer2   } from '@angular/core';
+import { Component, ElementRef, ViewChild, Renderer2 } from '@angular/core';
+import { GameService, Recommended_Game } from '../services/game.service';
+import { CommonModule } from '@angular/common';
+
 
 @Component({
   selector: 'app-recommendation-carousel',
   standalone: true,
-  imports: [],
+  imports: [ CommonModule ],
+  providers: [ GameService ],
   templateUrl: './recommendation-carousel.component.html',
   styleUrl: './recommendation-carousel.component.css'
 })
 export class RecommendationCarouselComponent {
+  recommendedGames: Recommended_Game[] = [];
+  recommendedGameListExist = false;
+  currentIndex = 0;
+  currentGame: Recommended_Game = {
+    app_id: '',
+    name: '',
+    price: 0,
+    tags: [],
+    thumbnail: '',
+    screenshots: []
+  };
+
+
   tags: string[] = ['Open World Survival Craft', 'PvE', 'Survival', 'Multiplayer', 'Co-op'];
+  tagsExist: boolean = false;
 
   @ViewChild('tagsHolder', { static: true }) tagsHolder!: ElementRef<HTMLDivElement>;
 
-  constructor(private renderer: Renderer2) {}
+  constructor(
+    private renderer: Renderer2,
+    private gameService: GameService) {}
 
-  ngAfterViewInit(): void {
-    this.renderTags(this.tags);
+  ngOnInit(): void {
+    this.gameService.getRecommendedGames().subscribe((data) => {
+      this.recommendedGames = data;
+      console.log(data)
+      if (this.recommendedGames.length > 0) {
+        this.recommendedGameListExist = true;
+        this.currentIndex = 0;
+        this.updateCurrentGame();
+      }
+      else {
+        this.recommendedGameListExist = false;
+      }
+    });
   }
+
+  updateCurrentGame(): void {
+    this.currentGame = this.recommendedGames[this.currentIndex];
+    this.tagsExist = this.currentGame['tags'] && this.currentGame['tags'].length > 0;
+    if (this.tagsExist) {
+      this.renderTags(this.currentGame.tags);
+    }
+  }
+  
+  changeGame(direction: 'next' | 'previous'): void {
+    if (direction === 'next') {
+      this.currentIndex = (this.currentIndex + 1) % this.recommendedGames.length;
+    } else if (direction === 'previous') {
+      this.currentIndex = (this.currentIndex - 1 + this.recommendedGames.length) % this.recommendedGames.length;
+    }
+    this.updateCurrentGame();
+  }
+  
 
   renderTags(tags: string[]): void {
     const container = this.tagsHolder.nativeElement;
@@ -28,10 +77,6 @@ export class RecommendationCarouselComponent {
       const text = this.renderer.createText(tagText);
       this.renderer.appendChild(tag, text);
       this.renderer.appendChild(container, tag);     
-      tag.style.fontSize = 'clamp(var(--font-size-small), 0.75vw, var(--font-size-standard))';
-      tag.style.backgroundColor = 'var(--accent-color)';
-      tag.style.borderRadius = 'var(--border-radius)';
-      tag.style.padding = '0.2rem 0.5rem';
     });
   }
 }

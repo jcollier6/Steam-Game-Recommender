@@ -5,7 +5,7 @@
     </div>
 
     <div class="recommended-games-holder">
-        <button>
+        <button (click)="changeGame('previous')">
             <svg width="15" height="30">
                 <use xlink:href="#arrow-icon"></use>
             </svg>
@@ -17,20 +17,28 @@
             />
 
             <div class="game-info-holder">
-                <span class="game-title">Super Duper Long Title of Game - The Best Title</span>
+                <span class="game-title">{{ currentGame['name'] }}</span>
                 <div class="screenshots-holder">
                     <div class="screenshot"></div>
                     <div class="screenshot"></div>
                     <div class="screenshot"></div>
                     <div class="screenshot"></div>
                 </div>
-                <span class="recommendation-justification">Recommended because you played games tagged with</span>
-                <div #tagsHolder class="tags-holder"></div>
+                <span class="recommendation-justification">
+                    <span class="recommended-word">Recommended</span> because you played games tagged with
+                </span>                  
+                <div #tagsHolder class="tags-holder">
+                    <ng-container *ngIf="tagsExist; else noTags"></ng-container>
+                    <ng-template #noTags>
+                        <p class="recommendation-justification">No tags available at this time</p>
+                    </ng-template>
+                </div>
+                  
                 <span class="price">Price</span>
             </div>
         </div>
 
-        <button class="right-arrow">
+        <button class="right-arrow" (click)="changeGame('next')">
             <svg width="15" height="30">
                 <use xlink:href="#arrow-icon"></use>
             </svg>
