@@ -171,8 +171,9 @@ def prepare_user_info(user_data):
     global df_user_owns
     df_user_owns = pd.DataFrame(user_library_data)
 
-    steam_tags_csv = "tags.csv"     
-    df_steam_tags = pd.read_csv(steam_tags_csv)
+    query = "SELECT app_id, tag FROM steam_game_tags;"
+    tags_data = query_db(query)
+    df_steam_tags = pd.DataFrame(tags_data)
 
     df_user_owns["app_id"] = df_user_owns["app_id"].astype(str)
     df_steam_tags["app_id"] = df_steam_tags["app_id"].astype(str)
