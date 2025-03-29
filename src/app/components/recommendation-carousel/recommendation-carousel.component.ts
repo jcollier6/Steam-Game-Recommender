@@ -1,5 +1,5 @@
 import { Component, ElementRef, ViewChild, Renderer2 } from '@angular/core';
-import { GameService, Recommended_Game } from '../services/game.service';
+import { GameService, Recommended_Game } from '../../services/game.service';
 import { CommonModule } from '@angular/common';
 import { trigger, state, style, animate, transition } from '@angular/animations';
 
