@@ -23,9 +23,24 @@
     text-decoration: underline;
 }
 
+.arrows-and-cards-holder{
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.arrows-and-cards-holder button {
+    width: 4%;
+    height: 4rem;
+    background-color: transparent;
+    border-radius: var(--border-radius);
+}
+.right-arrow {
+    transform: scaleX(-1);
+}
+
 .cards-holder {
     display: flex;
-    height: 15rem;
+    height: fit-content;
     width: fit-content;
     gap: 1rem;
 }

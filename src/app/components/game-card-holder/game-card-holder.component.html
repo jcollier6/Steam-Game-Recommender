@@ -1,11 +1,28 @@
 <div #container class="content-holder">
     <div class="top-bar" [style.width]="topBarWidth">
-        <span>Section Title</span>
+        <span>{{ cardHolderTitle }}</span>
         <button class="view-all-button">View All</button>
     </div>
-    <div class="cards-holder">
-        @for (card of visibleCards; track card) {
-            <app-game-card></app-game-card>
-        }
+    
+    <div class="arrows-and-cards-holder">
+        <button (click)="updateGameList('previous')">
+            <svg width="15" height="30">
+                <use xlink:href="#arrow-icon"></use>
+            </svg>
+        </button>
+
+        <div class="cards-holder">
+            @for (game of visibleGameList; track game) {
+                <app-game-card
+                [game]="game">
+                </app-game-card>
+            }
+        </div>
+
+        <button class="right-arrow" (click)="updateGameList('next')">
+            <svg width="15" height="30">
+                <use xlink:href="#arrow-icon"></use>
+            </svg>
+        </button>
     </div>
 </div>

@@ -1,11 +1,13 @@
 <div (click)="handleCardClick()" class="card">
-    <img class="thumbnail-image" [src]="thumbnail_image || '../../../assets/No-Image-Available.png'">
+    <img class="header-image" [src]="gameCard.header_image || '../../../assets/No-Image-Available.png'">
 
     <div class="game-info-holder">
-        <div class="game-name">{{ game_name }}</div>
+        <div class="game-name">{{ gameCard.name }}</div>
 
-        <div class="price">{{ price }}</div>
+        <div #gameName class="price">{{ price }}</div>
 
-        <div class="tags-holder"></div>
+        <div #tagsHolder class="tags-holder">
+            <ng-container *ngIf="tagsExist"></ng-container>
+        </div>
     </div>
 </div>

@@ -48,8 +48,6 @@ export class RecommendationCarouselComponent {
   tags: string[] = [];
   tagsExist: boolean = false;
 
-  @ViewChild('tagsHolder', { static: true }) tagsHolder!: ElementRef<HTMLDivElement>;
-
   constructor(
     private renderer: Renderer2,
     private gameService: GameService) {}
@@ -57,7 +55,6 @@ export class RecommendationCarouselComponent {
   ngOnInit(): void {
     this.gameService.getRecommendedGames().subscribe((data) => {
       this.recommendedGames = data;
-      console.log(data)
       if (this.recommendedGames.length > 0) {
         this.recommendedGameListExist = true;
         this.currentIndex = 0;
@@ -77,7 +74,7 @@ export class RecommendationCarouselComponent {
     }
 
     this.header_image = this.currentGame['header_image'] || '../../assets/No-Image-Available.png';
-    this.price = this.currentGame['is_free'] ? 'Free' : String(this.currentGame['price_usd'] || "");
+    this.price = this.currentGame['is_free'] ? 'Free To Play' : String(this.currentGame['price_usd'] || "");
     this.screenshots = this.currentGame.screenshots.map(url => url || "");
   }
   
@@ -95,7 +92,7 @@ export class RecommendationCarouselComponent {
     }, 100);
   }
   
-
+  @ViewChild('tagsHolder', { static: true }) tagsHolder!: ElementRef<HTMLDivElement>;
   renderTags(tags: string[]): void {
     const container = this.tagsHolder.nativeElement;
     container.innerHTML = ''; 
