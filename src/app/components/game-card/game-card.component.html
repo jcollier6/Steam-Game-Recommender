@@ -1,0 +1,11 @@
+<div (click)="handleCardClick()" class="card">
+    <img class="thumbnail-image" [src]="thumbnail_image || '../../../assets/No-Image-Available.png'">
+
+    <div class="game-info-holder">
+        <div class="game-name">{{ game_name }}</div>
+
+        <div class="price">{{ price }}</div>
+
+        <div class="tags-holder"></div>
+    </div>
+</div>

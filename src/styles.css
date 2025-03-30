@@ -76,7 +76,7 @@ button {
 
 @media (max-width: 896px) {
     .content {
-        width: 96vw;
+        width: 92vw;
     }
 }
 
@@ -84,21 +84,21 @@ button {
 /* Mobile up to 896px wide */
 @media (min-width: 896px) {
     .content {
-        max-width: 54rem;
+        max-width: 50rem;
     }
 }
 
 /* Screen size up to 720p */
 @media (min-width: 1280px) {
     .content {
-        max-width: 70rem;
+        max-width: 74rem;
     }
 }
 
 /* Desktop above 1080p */
 @media (min-width: 1921px) {
     .content {
-        max-width: 86rem;
+        max-width: 90rem;
     }
 }
   

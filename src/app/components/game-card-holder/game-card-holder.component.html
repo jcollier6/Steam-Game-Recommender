@@ -1,0 +1,11 @@
+<div #container class="content-holder">
+    <div class="top-bar" [style.width]="topBarWidth">
+        <span>Section Title</span>
+        <button class="view-all-button">View All</button>
+    </div>
+    <div class="cards-holder">
+        @for (card of visibleCards; track card) {
+            <app-game-card></app-game-card>
+        }
+    </div>
+</div>

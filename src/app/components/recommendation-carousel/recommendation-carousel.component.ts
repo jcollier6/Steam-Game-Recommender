@@ -45,7 +45,7 @@ export class RecommendationCarouselComponent {
   price: string = '';
   screenshots: string[] = ["", "", "", ""];
 
-  tags: string[] = ['Open World Survival Craft', 'PvE', 'Survival', 'Multiplayer', 'Co-op'];
+  tags: string[] = [];
   tagsExist: boolean = false;
 
   @ViewChild('tagsHolder', { static: true }) tagsHolder!: ElementRef<HTMLDivElement>;

@@ -1,0 +1,38 @@
+.content-holder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.top-bar {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    height: 10%;
+    padding: 0.5vw;
+    font-size: var(--font-size-large);
+}
+.view-all-button {
+    font-size: var(--font-size-large) !important;
+    color: var(--accent-color);
+    background-color: transparent;
+    font-weight: bold;
+}
+.view-all-button:hover {
+    text-decoration: underline;
+}
+
+.cards-holder {
+    display: flex;
+    height: 15rem;
+    width: fit-content;
+    gap: 1rem;
+}
+
+.holder-title {
+    font-size: var(--font-size-h1);
+}
+.view-all-button {
+    font-size: var(--font-size-xlarge);
+}
