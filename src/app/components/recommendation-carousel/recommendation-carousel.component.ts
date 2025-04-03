@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, Renderer2 } from '@angular/core';
+import { Component, Input, ElementRef, ViewChild, Renderer2 } from '@angular/core';
 import { GameService, Recommended_Game } from '../../services/game.service';
 import { CommonModule } from '@angular/common';
 import { trigger, state, style, animate, transition } from '@angular/animations';
@@ -29,7 +29,6 @@ import { trigger, state, style, animate, transition } from '@angular/animations'
 })
 export class RecommendationCarouselComponent {
   fadeState: 'visible' | 'hidden' = 'visible';
-  recommendedGames: Recommended_Game[] = [];
   recommendedGameListExist = false;
   currentIndex = 0;
   currentGame: Recommended_Game = {
@@ -48,23 +47,20 @@ export class RecommendationCarouselComponent {
   tags: string[] = [];
   tagsExist: boolean = false;
 
-  constructor(
-    private renderer: Renderer2,
-    private gameService: GameService) {}
+  private _recommendedGames: Recommended_Game[] = [];
 
-  ngOnInit(): void {
-    this.gameService.getRecommendedGames().subscribe((data) => {
-      this.recommendedGames = data;
-      if (this.recommendedGames.length > 0) {
-        this.recommendedGameListExist = true;
-        this.currentIndex = 0;
-        this.updateCurrentGame();
-      }
-      else {
-        this.recommendedGameListExist = false;
-      }
-    });
+  @Input()
+  set recommendedGames(value: Recommended_Game[]) {
+    this._recommendedGames = value || [];
+    this.recommendedGameListExist = this._recommendedGames.length > 0;
+    this.updateCurrentGame();
   }
+  
+  get recommendedGames(): Recommended_Game[] {
+    return this._recommendedGames;
+  }
+
+  constructor(private renderer: Renderer2) {}
 
   updateCurrentGame(): void {
     this.currentGame = this.recommendedGames[this.currentIndex];

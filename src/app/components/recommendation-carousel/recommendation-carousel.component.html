@@ -18,8 +18,8 @@
                 <span class="game-title">{{ currentGame['name'] }}</span>
                 <div class="screenshots-holder">
                     <div class="screenshot" 
-                         *ngFor="let image of screenshots; let i = index"
-                         [ngStyle]="{'background-image': 'url(' + (image || '../../assets/No-Image-Available.png') + ')'}">
+                        *ngFor="let image of screenshots; let i = index"
+                        [ngStyle]="{'background-image': 'url(' + (image || '../../assets/No-Image-Available.png') + ')'}">
                     </div>
                 </div>                  
                 <span class="recommendation-justification">
@@ -31,7 +31,7 @@
                         <p class="recommendation-justification">No tags available at this time</p>
                     </ng-template>
                 </div>
-                  
+                
                 <span class="price">{{ price }}</span>
             </div>
         </div>
