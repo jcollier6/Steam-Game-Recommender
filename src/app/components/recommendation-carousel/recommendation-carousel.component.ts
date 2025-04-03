@@ -1,5 +1,5 @@
 import { Component, Input, ElementRef, ViewChild, Renderer2 } from '@angular/core';
-import { GameService, Recommended_Game } from '../../services/game.service';
+import { Recommended_Game } from '../../services/game.service';
 import { CommonModule } from '@angular/common';
 import { trigger, state, style, animate, transition } from '@angular/animations';
 
@@ -8,7 +8,7 @@ import { trigger, state, style, animate, transition } from '@angular/animations'
   selector: 'app-recommendation-carousel',
   standalone: true,
   imports: [ CommonModule ],
-  providers: [ GameService ],
+  providers: [ ],
   templateUrl: './recommendation-carousel.component.html',
   styleUrl: './recommendation-carousel.component.css',
   animations: [
