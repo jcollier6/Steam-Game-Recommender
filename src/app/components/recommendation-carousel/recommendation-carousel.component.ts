@@ -1,5 +1,5 @@
 import { Component, Input, ElementRef, ViewChild, Renderer2 } from '@angular/core';
-import { Recommended_Game } from '../../services/game.service';
+import { Game_Info } from '../../services/game.service';
 import { CommonModule } from '@angular/common';
 import { trigger, state, style, animate, transition } from '@angular/animations';
 
@@ -31,7 +31,7 @@ export class RecommendationCarouselComponent {
   fadeState: 'visible' | 'hidden' = 'visible';
   recommendedGameListExist = false;
   currentIndex = 0;
-  currentGame: Recommended_Game = {
+  currentGame: Game_Info = {
     app_id: '',
     name: '',
     is_free: false,
@@ -47,16 +47,16 @@ export class RecommendationCarouselComponent {
   tags: string[] = [];
   tagsExist: boolean = false;
 
-  private _recommendedGames: Recommended_Game[] = [];
+  private _recommendedGames: Game_Info[] = [];
 
   @Input()
-  set recommendedGames(value: Recommended_Game[]) {
+  set recommendedGames(value: Game_Info[]) {
     this._recommendedGames = value || [];
     this.recommendedGameListExist = this._recommendedGames.length > 0;
     this.updateCurrentGame();
   }
   
-  get recommendedGames(): Recommended_Game[] {
+  get recommendedGames(): Game_Info[] {
     return this._recommendedGames;
   }
 

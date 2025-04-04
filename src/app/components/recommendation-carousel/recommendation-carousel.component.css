@@ -1,7 +1,6 @@
 
 .content {
     margin-top: 1rem !important;
-    margin-bottom: 1rem;
 }
 @media (max-width: 1280px) {
     
@@ -37,14 +36,14 @@
 /* Screen size up to 720p */
 @media (min-width: 1280px) {
     .content {
-        height: 30rem;
+        height: 27rem;
     }
 }
 
 /* Desktop above 1080p */
 @media (min-width: 1921px) {
     .content {
-        height: 36rem;
+        height: 32rem;
     }
 }
 
@@ -70,7 +69,7 @@
 .recommended-games-holder {
     display: flex;
     width: 100%;
-    height: 80%;
+    height: 90%;
     background-color: var(--secondary-color);
     border-radius: var(--border-radius);
     box-shadow: 4px 4px 4px 4px var(--shadow-color)

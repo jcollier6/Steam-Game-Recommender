@@ -1,25 +1,17 @@
 @defer (when isReady) {
-    <div class="content">
+    <div class="content" style="gap: 2vh;">
         <app-recommendation-carousel [recommendedGames]="recommendedGames"></app-recommendation-carousel>
 
-        <app-game-card-holder></app-game-card-holder>
+        <app-game-card-holder 
+            [gameList]="recentGames"
+            [cardHolderTitle]="'Recently Played'">
+        </app-game-card-holder>
 
-        <div class="list" style="margin-top: 10vh;">
-            @if ( recentGameListExist ) {
-                <h1>Games Played in the Last Two Weeks</h1>
-                <ul>
-                    @for ( game of recentGames; track game ) {
-                    <li><strong>{{game.name}}</strong></li>
-                    All Time Minutes: {{ game.playtime_forever }} <br>
-                    Recent Minutes: {{ game.playtime_2weeks }}
-                }
-                </ul>
-            }
-            @else {
-                <p>No games played in the last two weeks found.</p>
-            }
-        </div>
+        <app-game-card-holder 
+            [gameList]="recommendedGames"
+            [cardHolderTitle]="'Games With Your Top Tag of '">
+        </app-game-card-holder>
     </div>
 } @loading {
     <app-shell-loader></app-shell-loader>
-  }
+}

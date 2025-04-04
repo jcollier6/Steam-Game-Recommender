@@ -1,5 +1,5 @@
 import { Component, ChangeDetectorRef, OnInit } from '@angular/core';
-import { GameService, Recommended_Game, Recent_Game } from '../services/game.service';
+import { GameService, Game_Info } from '../services/game.service';
 import { HttpClientModule } from '@angular/common/http';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -16,8 +16,8 @@ import { ShellLoaderComponent } from "../components/shell-loader/shell-loader.co
   styleUrls: ['./home-page.component.css']
 })
 export class HomePageComponent implements OnInit {
-  recommendedGames: Recommended_Game[] = [];
-  recentGames: Recent_Game[] = [];
+  recommendedGames: Game_Info[] = [];
+  recentGames: Game_Info[] = [];
   recommendedGameListExist = false;
   recentGameListExist = false;
   isReady = false;
@@ -40,7 +40,6 @@ export class HomePageComponent implements OnInit {
 
     this.gameService.getRecentlyPlayed().subscribe((data) => {
       this.recentGames = data;
-      this.recentGameListExist = this.recentGames.length > 0;
     });
   }
 }

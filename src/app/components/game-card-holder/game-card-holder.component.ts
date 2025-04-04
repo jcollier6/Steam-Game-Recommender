@@ -1,6 +1,6 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, HostListener, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, ElementRef, ViewChild, AfterViewInit, HostListener, ChangeDetectorRef } from '@angular/core';
 import { GameCardComponent } from "../game-card/game-card.component";
-import { Recommended_Game, GameService } from '../../services/game.service';
+import { Game_Info } from '../../services/game.service';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -11,14 +11,12 @@ import { CommonModule } from '@angular/common';
   styleUrl: './game-card-holder.component.css'
 })
 export class GameCardHolderComponent implements AfterViewInit {
-  cardHolderTitle: string = '';
   topBarWidth: string = '100%';
   fadeState: 'visible' | 'hidden' = 'visible';
-  gameList: Recommended_Game[] = [];
-  visibleGameList: Recommended_Game[] = [];
+  visibleGameList: Game_Info[] = [];
   gameListExist = false;
   currentIndex = 0;
-  currentGame: Recommended_Game = {
+  currentGame: Game_Info = {
     app_id: '',
     name: '',
     is_free: false,
@@ -31,7 +29,20 @@ export class GameCardHolderComponent implements AfterViewInit {
   private _resizeObserver!: ResizeObserver;
   private _resizeTimeout: any;
   private _maxCards: number = 0;
+  private _gameList: Game_Info[] = [];
 
+  @Input() cardHolderTitle: string = '';
+
+  @Input()
+  set gameList(value: Game_Info[]) {
+    this._gameList = value || [];
+    this.gameListExist = this._gameList.length > 0;
+  }
+  
+  get gameList(): Game_Info[] {
+    return this._gameList;
+  }
+  
   get maxCards(): number {
     return this._maxCards;
   }
@@ -45,23 +56,7 @@ export class GameCardHolderComponent implements AfterViewInit {
     }
   }
 
-  constructor(
-    private cdRef: ChangeDetectorRef,
-    private gameService: GameService
-  ) {}
-
-  ngOnInit(): void {
-    this.gameService.getRecommendedGames().subscribe((data) => {
-      this.gameList = data;
-      if (this.gameList.length > 0) {
-        this.gameListExist = true;
-        this.currentIndex = 0;
-      }
-      else {
-        this.gameListExist = false;
-      }
-    });
-  }
+  constructor(private cdRef: ChangeDetectorRef) {}
   
   @ViewChild('container', { static: false }) containerRef!: ElementRef;
   ngAfterViewInit(): void {
@@ -106,8 +101,8 @@ export class GameCardHolderComponent implements AfterViewInit {
     this.cdRef.detectChanges();
   }
 
-  getWrappedSubsection(list: Recommended_Game[], start: number, count: number): Recommended_Game[] {
-    const result: Recommended_Game[] = [];
+  getWrappedSubsection(list: Game_Info[], start: number, count: number): Game_Info[] {
+    const result: Game_Info[] = [];
     const length = list.length;
   
     for (let i = 0; i < count; i++) {

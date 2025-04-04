@@ -1,5 +1,5 @@
 import { Component, Input, ElementRef, ViewChild, Renderer2 } from '@angular/core';
-import { Recommended_Game } from '../../services/game.service';
+import { Game_Info } from '../../services/game.service';
 import { CommonModule } from '@angular/common';
 
 
@@ -25,7 +25,7 @@ export class GameCardComponent {
 
   header_image: string = '../../assets/No-Image-Available.png';
   tagsExist: boolean = false;
-  gameCard: Recommended_Game = {
+  gameCard: Game_Info = {
       app_id: '',
       name: '',
       is_free: false,
