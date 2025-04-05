@@ -52,7 +52,8 @@ def get_tags():
 @app.get("/recommended_games")
 def get_recommended_games():
     try:
-        data = recommended_games_additional_info()
+        print("recommended ", df_recommended_games)
+        data = get_games_additional_info(df_recommended_games)
         return JSONResponse(content=data)  
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
@@ -60,9 +61,12 @@ def get_recommended_games():
 @app.get("/recently_played")
 def get_recently_played():
     try:
-        data = df_user_owns[df_user_owns["playtime_2weeks"] > 0][
-            ["name", "playtime_forever", "playtime_2weeks"]
-        ].to_dict(orient="records")
+        recently_played = df_user_owns[df_user_owns["playtime_2weeks"] > 0][
+            ["app_id", "name"]
+        ]
+        print("before ", recently_played)
+        data = get_games_additional_info(recently_played)
+        print("after")
         return JSONResponse(content=data)  
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
@@ -104,16 +108,14 @@ async def process_steam_id(steam_id: str):
 user_game_scores = dict()
 candidate_app_ids = set()
 app_id_to_tags = dict()
-recommended_games = pd.DataFrame()
+df_recommended_games = pd.DataFrame()
 df_user_owns = pd.DataFrame()
 API_KEY = ""
 steam_id = None 
 
 # Initialize global DataFrames using connection pooling
 metadata = query_db("""
-    SELECT app_id, name, coming_soon, release_date, is_free, price_usd, 
-           header_image, screenshot1, screenshot2, screenshot3, screenshot4 
-    FROM steam_game_details;
+    SELECT app_id, name FROM steam_game_details;
 """)
 df_game_metadata = pd.DataFrame(metadata)
 df_game_metadata["app_id"] = df_game_metadata["app_id"].astype(str)
@@ -238,20 +240,20 @@ def calculate_recommended_games():
 
     df_scores.reset_index(drop=True, inplace=True)
 
-    global recommended_games
-    recommended_games = df_scores.head(10).merge(df_game_metadata, on="app_id", how="left")
+    global df_recommended_games
+    df_recommended_games = df_scores.head(10).merge(df_game_metadata, on="app_id", how="left")
 
 
-def recommended_games_additional_info():
+def get_games_additional_info(game_list: pd.DataFrame):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     updated_games = []
 
-    for index, game in recommended_games.iterrows():
+    for index, game in game_list.iterrows():
         app_id = game['app_id']
         
         cursor.execute("""
-            SELECT price_usd, header_image, screenshot1, screenshot2, screenshot3, screenshot4
+            SELECT is_free, price_usd, header_image, screenshot1, screenshot2, screenshot3, screenshot4
             FROM steam_game_details 
             WHERE app_id = %s
         """, (app_id,))
@@ -259,6 +261,7 @@ def recommended_games_additional_info():
         additional_info = cursor.fetchone()
         
         if additional_info:
+            is_free = bool(additional_info['is_free'])
             price_usd = additional_info['price_usd']
             header_image = additional_info['header_image']
             screenshot1 = additional_info['screenshot1']
@@ -273,6 +276,7 @@ def recommended_games_additional_info():
             ]
             price_usd = price_usd if price_usd is not None else ""
         else:
+            is_free = False
             price_usd = ""
             header_image = ""
             screenshots = ["", "", "", ""]
@@ -282,10 +286,9 @@ def recommended_games_additional_info():
         updated_games.append({
             "app_id": game["app_id"],
             "name": game["name"],
-            "is_free": game["is_free"],
+            "is_free": is_free,
             "price_usd": price_usd,
             "tags": list(game_tags),
-            "header_image": game.get("header_image", ""),
             "header_image": header_image,
             "screenshots": screenshots 
         })
