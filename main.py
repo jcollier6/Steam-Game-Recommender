@@ -3,14 +3,20 @@ import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import requests
-import pandas as pd
+import json
 from collections import Counter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Global init here
+    initialize_global_game_data()
+    yield
+    # Optional cleanup logic here
 
-### database setup
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,7 +58,6 @@ def get_tags():
 @app.get("/recommended_games")
 def get_recommended_games():
     try:
-        print("recommended ", df_recommended_games)
         data = get_games_additional_info(df_recommended_games)
         return JSONResponse(content=data)  
     except Exception as e:
@@ -61,16 +66,70 @@ def get_recommended_games():
 @app.get("/recently_played")
 def get_recently_played():
     try:
-        recently_played = df_user_owns[df_user_owns["playtime_2weeks"] > 0][
-            ["app_id", "name"]
-        ]
-        print("before ", recently_played)
+        recently_played = df_user_owns[df_user_owns["playtime_2weeks"] > 0][["app_id"]]
         data = get_games_additional_info(recently_played)
-        print("after")
         return JSONResponse(content=data)  
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+@app.get("/top_tag_games")
+def get_top_tag_games():
+    try:
+        data = get_user_top_tags_games()
+        return JSONResponse(content=data)  
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+def initialize_global_game_data():
+    global df_review_data, game_details_by_app_id, app_id_to_tags
+
+    print("⚙️ Initializing global game data...")
+
+    # Load reviews
+    review_data = query_db("SELECT app_id, bayesian_score FROM steam_game_reviews;")
+    df_review_data = pd.DataFrame(review_data)
+    df_review_data["app_id"] = df_review_data["app_id"].astype(str)
+    df_review_data["bayesian_score"] = df_review_data["bayesian_score"].astype(float)
+
+    # Load details
+    rows = query_db("""
+        SELECT app_id, name, is_free, price_usd, header_image,
+               screenshot1, screenshot2, screenshot3, screenshot4
+        FROM steam_game_details
+    """)
+    game_details = {}
+    for row in rows:
+        app_id = str(row["app_id"])
+        game_details[app_id] = {
+            "name": row["name"],
+            "is_free": bool(row["is_free"]),
+            "price_usd": row["price_usd"] if row["price_usd"] is not None else "",
+            "header_image": row["header_image"] or "",
+            "screenshots": [
+                row["screenshot1"] or "",
+                row["screenshot2"] or "",
+                row["screenshot3"] or "",
+                row["screenshot4"] or ""
+            ]
+        }
+    game_details_by_app_id = game_details
+
+    # Load tags
+    tags_raw = query_db("SELECT app_id, tags FROM steam_game_details;")
+    tag_dict = {}
+    for row in tags_raw:
+        try:
+            app_id = str(row["app_id"])
+            tags_json = json.loads(row["tags"])
+            tag_dict[app_id] = set(tags_json.get("tags", []))
+        except (TypeError, json.JSONDecodeError):
+            tag_dict[app_id] = set()
+    app_id_to_tags = tag_dict
+
+    get_API_key() 
+
+    print("✅ Global game data ready.")
 
 
 # --- Steam ID Request ---
@@ -90,8 +149,7 @@ async def submit_steam_id(request: SteamIdRequest):
     
 async def process_steam_id(steam_id: str):
     print(f"Processing Steam ID: {steam_id}")
-    try:
-        get_API_key()  
+    try: 
         user_data = is_valid_id(steam_id) 
         prepare_user_info(user_data)  
         calculate_recommended_games()  
@@ -108,23 +166,12 @@ async def process_steam_id(steam_id: str):
 user_game_scores = dict()
 candidate_app_ids = set()
 app_id_to_tags = dict()
+game_details_by_app_id = dict()
 df_recommended_games = pd.DataFrame()
 df_user_owns = pd.DataFrame()
+df_scores = pd.DataFrame()
 API_KEY = ""
 steam_id = None 
-
-# Initialize global DataFrames using connection pooling
-metadata = query_db("""
-    SELECT app_id, name FROM steam_game_details;
-""")
-df_game_metadata = pd.DataFrame(metadata)
-df_game_metadata["app_id"] = df_game_metadata["app_id"].astype(str)
-df_game_metadata["name"] = df_game_metadata["name"].astype(str)
-
-review_data = query_db("SELECT app_id, bayesian_score FROM steam_game_reviews;")
-df_review_data = pd.DataFrame(review_data)
-df_review_data["app_id"] = df_review_data["app_id"].astype(str)
-df_review_data["bayesian_score"] = df_review_data["bayesian_score"].astype(float)
 
 # --- Helper Functions ---
 def get_API_key():
@@ -173,26 +220,7 @@ def prepare_user_info(user_data):
     global df_user_owns
     df_user_owns = pd.DataFrame(user_library_data)
 
-    query = "SELECT app_id, tag FROM steam_game_tags;"
-    tags_data = query_db(query)
-    df_steam_tags = pd.DataFrame(tags_data)
-
     df_user_owns["app_id"] = df_user_owns["app_id"].astype(str)
-    df_steam_tags["app_id"] = df_steam_tags["app_id"].astype(str)
-
-    # Filter df_user_owns to remove games not known to my database
-    df_user_owns = df_user_owns[df_user_owns["app_id"].isin(df_game_metadata["app_id"])]
-
-    df_app_tags = (
-        df_steam_tags
-        .groupby('app_id')['tag']
-        .apply(set)
-        .reset_index()
-    )
-
-    global app_id_to_tags
-    app_id_to_tags = dict(zip(df_app_tags['app_id'], df_app_tags['tag']))
-    user_owned_app_ids = set(df_user_owns["app_id"].unique())
 
     # Normalize playtime_forever using 75th quantile
     playtime_75th = df_user_owns["playtime_forever"].quantile(0.75)
@@ -202,9 +230,6 @@ def prepare_user_info(user_data):
     df_user_owns["weighted_playtime"] = (
         df_user_owns["normalized_playtime"] + 15 * (df_user_owns["playtime_2weeks"] / playtime_75th)
     )
-
-    # add additional game information to the owned games
-    df_user_owns = df_user_owns.merge(df_game_metadata, on="app_id", how="left")
 
     # collect all tags from the user's owned games and weight by weighted_playtime
     user_tag_counts = Counter()
@@ -219,6 +244,7 @@ def prepare_user_info(user_data):
     user_game_scores = dict(user_tag_counts)
 
     all_app_ids = set(app_id_to_tags.keys())
+    user_owned_app_ids = set(df_user_owns["app_id"].unique())
     global candidate_app_ids
     candidate_app_ids = all_app_ids - user_owned_app_ids
 
@@ -230,6 +256,7 @@ def calculate_recommended_games():
         overlap_score = sum(user_game_scores.get(tag, 0) for tag in game_tags)
         results.append((app_id, overlap_score))
 
+    global df_scores
     df_scores = pd.DataFrame(results, columns=["app_id", "overlap_score"])
     df_scores = df_scores.merge(
         df_review_data[["app_id", "bayesian_score"]],
@@ -241,57 +268,59 @@ def calculate_recommended_games():
     df_scores.reset_index(drop=True, inplace=True)
 
     global df_recommended_games
-    df_recommended_games = df_scores.head(10).merge(df_game_metadata, on="app_id", how="left")
+    df_recommended_games = df_scores.head(10)
 
 
 def get_games_additional_info(game_list: pd.DataFrame):
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
     updated_games = []
 
-    for index, game in game_list.iterrows():
-        app_id = game['app_id']
-        
-        cursor.execute("""
-            SELECT is_free, price_usd, header_image, screenshot1, screenshot2, screenshot3, screenshot4
-            FROM steam_game_details 
-            WHERE app_id = %s
-        """, (app_id,))
-        
-        additional_info = cursor.fetchone()
-        
-        if additional_info:
-            is_free = bool(additional_info['is_free'])
-            price_usd = additional_info['price_usd']
-            header_image = additional_info['header_image']
-            screenshot1 = additional_info['screenshot1']
-            screenshot2 = additional_info['screenshot2']
-            screenshot3 = additional_info['screenshot3']
-            screenshot4 = additional_info['screenshot4']
-            screenshots = [
-                screenshot1 if screenshot1 is not None else "",
-                screenshot2 if screenshot2 is not None else "",
-                screenshot3 if screenshot3 is not None else "",
-                screenshot4 if screenshot4 is not None else ""
-            ]
-            price_usd = price_usd if price_usd is not None else ""
-        else:
-            is_free = False
-            price_usd = ""
-            header_image = ""
-            screenshots = ["", "", "", ""]
-
-        game_tags = app_id_to_tags.get(game['app_id'], [])
+    for _, game in game_list.iterrows():
+        app_id = str(game['app_id'])
+        details = game_details_by_app_id.get(app_id, {})
+        tags = list(app_id_to_tags.get(app_id, []))
 
         updated_games.append({
-            "app_id": game["app_id"],
-            "name": game["name"],
-            "is_free": is_free,
-            "price_usd": price_usd,
-            "tags": list(game_tags),
-            "header_image": header_image,
-            "screenshots": screenshots 
+            "app_id": app_id,
+            "name": details.get("name", ""),
+            "is_free": details.get("is_free", False),
+            "price_usd": details.get("price_usd", ""),
+            "tags": tags,
+            "header_image": details.get("header_image", ""),
+            "screenshots": details.get("screenshots", ["", "", "", ""])
         })
-    cursor.close()
-    conn.close()
+
     return updated_games
+
+
+
+def get_user_top_tags_games() :
+    # get user's top five tags and remove universal tags
+    universal_tags = ["Multiplayer", "Singleplayer", "Co-op", "Online Co-Op", "Action", "First-Person", "Third Person", "Third-Person Shooter"]
+    filtered_user_tags = {
+        tag: count for tag, count in user_game_scores.items()
+        if tag not in universal_tags
+    }
+    top_user_tags = [tag for tag, _ in Counter(filtered_user_tags).most_common(5)]
+    print(top_user_tags)
+
+    # For each tag, get top 20 games from df_scores
+    user_top_tags_games = {}
+    for tag in top_user_tags:
+        # Filter df_scores for games that contain this tag
+        matching_app_ids = [
+            app_id for app_id in df_scores["app_id"]
+            if tag in app_id_to_tags.get(app_id, set())
+        ]
+
+        # Filter df_scores by those app_ids and get top 20 by final_score
+        tag_scores = df_scores[df_scores["app_id"].isin(matching_app_ids)]
+        tag_game_list = tag_scores.nlargest(20, "final_score")
+        tag_game_list = get_games_additional_info(tag_game_list)
+
+        user_top_tags_games[tag] = tag_game_list
+
+    return user_top_tags_games
+
+
+
+
