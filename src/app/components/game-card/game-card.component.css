@@ -36,7 +36,9 @@
 }
 
 .game-name {
+    max-height: calc(2.4 * (var(--font-size-large)));
     font-size: var(--font-size-large);
+    overflow: hidden;
 }
 .price {
     padding-top: 0.25rem;

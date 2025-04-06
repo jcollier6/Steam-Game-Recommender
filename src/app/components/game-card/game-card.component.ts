@@ -15,11 +15,6 @@ export class GameCardComponent {
   game_name = '';
   thumbnail_image: string = '../../../assets/No-Image-Available.png';
 
-  handleCardClick(app_id: string) {
-    const url = `https://store.steampowered.com/app/${app_id}`;
-    window.open(url, '_blank');
-  }
-
   constructor(
     private renderer: Renderer2,
   ) {}
@@ -65,5 +60,10 @@ export class GameCardComponent {
       this.renderer.appendChild(tag, text);
       this.renderer.appendChild(container, tag);
     }
+  }
+
+  handleCardClick(app_id: string) {
+    const url = `https://store.steampowered.com/app/${app_id}`;
+    window.open(url, '_blank');
   }
 }
