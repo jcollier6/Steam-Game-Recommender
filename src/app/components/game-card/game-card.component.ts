@@ -15,8 +15,9 @@ export class GameCardComponent {
   game_name = '';
   thumbnail_image: string = '../../../assets/No-Image-Available.png';
 
-  handleCardClick() {
-    console.log('Card clicked!');
+  handleCardClick(app_id: string) {
+    const url = `https://store.steampowered.com/app/${app_id}`;
+    window.open(url, '_blank');
   }
 
   constructor(

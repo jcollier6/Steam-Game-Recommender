@@ -42,7 +42,6 @@ export class HomePageComponent implements OnInit {
 
     this.gameService.getRecentlyPlayed().subscribe((data) => {
       this.recentGames = data;
-      console.log(this.recentGames)
     });
 
     this.gameService.getTopTagGames().subscribe((data: Record<string, Game_Info[]>) => {
