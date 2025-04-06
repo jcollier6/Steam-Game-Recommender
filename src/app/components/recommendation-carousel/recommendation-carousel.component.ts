@@ -62,6 +62,11 @@ export class RecommendationCarouselComponent {
 
   constructor(private renderer: Renderer2) {}
 
+  handleCardClick(app_id: string) {
+    const url = `https://store.steampowered.com/app/${app_id}`;
+    window.open(url, '_blank');
+  }
+  
   updateCurrentGame(): void {
     this.currentGame = this.recommendedGames[this.currentIndex];
     this.tagsExist = this.currentGame['tags'] && this.currentGame['tags'].length > 0;

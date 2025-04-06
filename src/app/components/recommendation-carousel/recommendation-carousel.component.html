@@ -11,7 +11,7 @@
             </svg>
         </button>
 
-        <div class="recommended-games" [@fadeAnimation]="fadeState">
+        <div (click)="handleCardClick(currentGame['app_id'])" class="recommended-games" [@fadeAnimation]="fadeState">
             <img class="game-header_image" [src]="header_image" />
 
             <div class="game-info-holder">

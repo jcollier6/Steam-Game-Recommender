@@ -84,6 +84,7 @@
 }
 .recommended-games {
     display: flex;
+    cursor: pointer;
 }
 .game-header_image {
     width: 100%;
