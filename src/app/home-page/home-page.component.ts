@@ -18,6 +18,8 @@ import { ShellLoaderComponent } from "../components/shell-loader/shell-loader.co
 export class HomePageComponent implements OnInit {
   recommendedGames: Game_Info[] = [];
   recentGames: Game_Info[] = [];
+  tagNames: string[] = [];
+  tagGames: Game_Info[][] = [];
   recommendedGameListExist = false;
   recentGameListExist = false;
   isReady = false;
@@ -40,6 +42,12 @@ export class HomePageComponent implements OnInit {
 
     this.gameService.getRecentlyPlayed().subscribe((data) => {
       this.recentGames = data;
+      console.log(this.recentGames)
+    });
+
+    this.gameService.getTopTagGames().subscribe((data: Record<string, Game_Info[]>) => {
+      this.tagNames = Object.keys(data);
+      this.tagGames = this.tagNames.map((tag: string) => data[tag]);
     });
   }
 }

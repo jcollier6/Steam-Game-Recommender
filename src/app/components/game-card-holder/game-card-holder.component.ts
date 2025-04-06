@@ -33,6 +33,8 @@ export class GameCardHolderComponent implements AfterViewInit {
 
   @Input() cardHolderTitle: string = '';
 
+  @Input() isRecentTitle: boolean = false;
+
   @Input()
   set gameList(value: Game_Info[]) {
     this._gameList = value || [];

@@ -27,4 +27,8 @@ export class GameService {
   getRecentlyPlayed(): Observable<Game_Info[]> {
     return this.httpClient.get<Game_Info[]>(`${this.apiUrl}/recently_played`);
   }
+
+  getTopTagGames(): Observable<Record<string, Game_Info[]>> {
+    return this.httpClient.get<Record<string, Game_Info[]>>(`${this.apiUrl}/top_tag_games`);
+  }
 }

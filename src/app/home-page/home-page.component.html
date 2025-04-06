@@ -4,13 +4,16 @@
 
         <app-game-card-holder 
             [gameList]="recentGames"
-            [cardHolderTitle]="'Recently Played'">
+            [cardHolderTitle]="'Recently Played'"
+            [isRecentTitle]="true">
         </app-game-card-holder>
 
-        <app-game-card-holder 
-            [gameList]="recommendedGames"
-            [cardHolderTitle]="'Games With Your Top Tag of '">
-        </app-game-card-holder>
+        @for (tag of tagNames; track tag; let i = $index) {
+            <app-game-card-holder 
+                [gameList]="tagGames[i]"
+                [cardHolderTitle]= "tagNames[i]">
+            </app-game-card-holder>
+        }
     </div>
 } @loading {
     <app-shell-loader></app-shell-loader>

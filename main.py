@@ -301,20 +301,32 @@ def get_user_top_tags_games() :
         if tag not in universal_tags
     }
     top_user_tags = [tag for tag, _ in Counter(filtered_user_tags).most_common(5)]
-    print(top_user_tags)
 
-    # For each tag, get top 20 games from df_scores
+    # Get app_ids of recommended games to exclude
+    excluded_app_ids = set(df_recommended_games["app_id"].unique())
+
     user_top_tags_games = {}
+
     for tag in top_user_tags:
-        # Filter df_scores for games that contain this tag
+        # Get app_ids with this tag
         matching_app_ids = [
             app_id for app_id in df_scores["app_id"]
             if tag in app_id_to_tags.get(app_id, set())
         ]
 
-        # Filter df_scores by those app_ids and get top 20 by final_score
-        tag_scores = df_scores[df_scores["app_id"].isin(matching_app_ids)]
+        # Exclude already recommended games
+        filtered_app_ids = [app_id for app_id in matching_app_ids if app_id not in excluded_app_ids]
+
+        # Get score data for remaining games
+        tag_scores = df_scores[df_scores["app_id"].isin(filtered_app_ids)]
+
+        # Take top 20 by score
         tag_game_list = tag_scores.nlargest(20, "final_score")
+
+        # Shuffle the top 20 rows to randomize the order
+        tag_game_list = tag_game_list.sample(frac=1).reset_index(drop=True)
+
+        # Add additional game info
         tag_game_list = get_games_additional_info(tag_game_list)
 
         user_top_tags_games[tag] = tag_game_list

@@ -1,6 +1,12 @@
 <div #container class="content-holder">
     <div class="top-bar" [style.width]="topBarWidth">
-        <span>{{ cardHolderTitle }}</span>
+        @if (isRecentTitle) {
+            <span>{{ cardHolderTitle }}</span>
+        } @else {
+            <span>Games With Your Top Tag of 
+                <span class="tag-title">{{ cardHolderTitle }}</span>
+            </span>
+        }
         <button class="view-all-button">View All</button>
     </div>
     
