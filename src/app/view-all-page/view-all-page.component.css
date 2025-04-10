@@ -1,0 +1,105 @@
+.content {
+    display: flex;
+    gap: 1rem;
+    flex-direction: row;
+    max-width: 93rem;
+    padding: 2rem;
+}
+
+.game-cards-holder {
+    display: flex;
+    flex-wrap: wrap;
+    height: fit-content;
+    gap: 1rem;
+}
+
+.options-panel {
+    /* position: fixed;
+    left: 20vw;
+    top: 20vw; */
+    display: flex;
+    flex-direction: column;
+    min-width: 15rem;
+    gap: 1rem;
+}
+.option-container {
+    display: flex;
+    flex-direction: column;
+    border: 3px solid var(--secondary-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+.option-title {
+    width: 100%;
+    background-color: var(--secondary-color);
+    padding: 0.5rem;
+}
+.option-content {
+    display: flex;
+}
+
+
+.divider-line {
+    width: 90%;
+    border: none;
+    border-top: 2px solid var(--secondary-color); 
+    margin-left: 5%;
+}
+ 
+
+/* Slider stuff */
+.slider-holder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.slider-value {
+    font-size: var(--font-size-standard);
+}
+.slider-label-holder {
+    display: flex;
+    justify-content: space-between;
+    width: 90%;
+    margin: 0 5%;
+    margin-bottom: 0.5rem;
+}
+.slider-label {
+    font-size: var(--font-size-small);
+}
+
+/* custom checkbox */
+.custom-checkbox {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    margin-left: 1rem;
+}
+.custom-checkbox input[type="checkbox"] {
+    display: none; /* hide native checkbox */
+}
+.checkmark {
+    width: 16px;           
+    height: 16px;
+    border: 2px solid var(--secondary-color);  
+    border-radius: 0.25rem;
+    margin-right: 0.5rem;
+    position: relative;
+}
+.custom-checkbox input[type="checkbox"]:checked + .checkmark {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+.custom-checkbox input[type="checkbox"]:checked + .checkmark::after {
+    content: "";
+    position: absolute;
+    left: 5px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+  

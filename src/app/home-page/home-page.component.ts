@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { RecommendationCarouselComponent } from '../components/recommendation-carousel/recommendation-carousel.component';
 import { GameCardHolderComponent } from "../components/game-card-holder/game-card-holder.component";
 import { ShellLoaderComponent } from "../components/shell-loader/shell-loader.component";
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'home-page',
@@ -26,7 +27,8 @@ export class HomePageComponent implements OnInit {
 
   constructor(
     private gameService: GameService,
-    private cdRef: ChangeDetectorRef
+    private cdRef: ChangeDetectorRef,
+    private router: Router
   ) {}
 
   ngAfterViewInit(): void {
@@ -48,5 +50,9 @@ export class HomePageComponent implements OnInit {
       this.tagNames = Object.keys(data);
       this.tagGames = this.tagNames.map((tag: string) => data[tag]);
     });
+  }
+
+  onViewAllClicked(cardGroup: string): void {
+    this.router.navigate(['/view-all'], { queryParams: { cardGroup }});
   }
 }

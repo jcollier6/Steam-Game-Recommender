@@ -1,6 +1,9 @@
 @defer (when isReady) {
     <div class="content" style="gap: 2vh;">
-        <app-recommendation-carousel [recommendedGames]="recommendedGames"></app-recommendation-carousel>
+        <app-recommendation-carousel 
+            [recommendedGames]="recommendedGames"
+            (viewAllClicked)="onViewAllClicked($event)">
+        </app-recommendation-carousel>
 
         <app-game-card-holder 
             [gameList]="recentGames"

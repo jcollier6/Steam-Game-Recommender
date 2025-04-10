@@ -1,0 +1,73 @@
+@defer (when isReady) {
+    <div class="content">
+        <div class="options-panel">
+            <!-- Price option -->
+            <div class="option-container">
+                <span class="option-title">Filter by Price</span>
+                <div class="slider-holder">
+                    <app-custom-slider [(value)]="priceSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                    <span class="slider-value">Value: {{ priceSliderValue }}</span>
+                </div>
+                <div class="divider-line"></div>
+                <form [formGroup]="checkBox">
+                    <label class="custom-checkbox">
+                      <input type="checkbox" formControlName="isHideF2PChecked" />
+                      <span class="checkmark"></span>
+                      Hide free to play
+                    </label>
+                </form>
+            </div>
+            <!-- Filter by tag option -->
+            <div class="option-container">
+                <span class="option-title">Filter by Tag</span>
+                
+                
+            </div>
+            <!-- Filter by language option -->
+            <div class="option-container">
+                <span class="option-title">Filter by Language</span>
+                
+                
+            </div>
+
+            <div class="divider-line"></div>
+
+            <!-- Weight by Review Count option -->
+            <div class="option-container">
+                <span class="option-title">Weight by Review Count</span>
+                <div class="slider-holder">
+                    <div class="slider-label-holder">
+                        <span class="slider-label">Niche</span>
+                        <span class="slider-label">Popular</span>
+                    </div>
+                    <app-custom-slider [(value)]="reviewCountSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                    <span class="slider-value">{{ reviewCountSliderValue }}%</span>
+                </div>
+                
+            </div>
+            <!-- Weight by Review Score option -->
+            <div class="option-container">
+                <span class="option-title">Weight by Review Score</span>
+                <div class="slider-holder">
+                    <div class="slider-label-holder">
+                        <span class="slider-label">Negative</span>
+                        <span class="slider-label">Positive</span>
+                    </div>
+                    <app-custom-slider [(value)]="reviewScoreSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                    <span class="slider-value">{{ reviewScoreSliderValue }}%</span>
+                </div>
+                
+            </div>
+        </div>
+
+        <div class="game-cards-holder">
+            @for (game of allRecommendedGames; track game) {
+                <app-game-card
+                    [game]="game">
+                </app-game-card>
+            }
+        </div>
+    </div>
+} @loading {
+    <app-shell-loader></app-shell-loader>
+}

@@ -24,6 +24,10 @@ export class GameService {
     return this.httpClient.get<Game_Info[]>(`${this.apiUrl}/recommended_games`);
   }
 
+  getAllRecommendedGames(): Observable<Game_Info[]> {
+    return this.httpClient.get<Game_Info[]>(`${this.apiUrl}/all_recommended_games`);
+  }
+
   getRecentlyPlayed(): Observable<Game_Info[]> {
     return this.httpClient.get<Game_Info[]>(`${this.apiUrl}/recently_played`);
   }

@@ -1,4 +1,4 @@
-import { Component, Input, ElementRef, ViewChild, Renderer2 } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ElementRef, ViewChild, Renderer2 } from '@angular/core';
 import { Game_Info } from '../../services/game.service';
 import { CommonModule } from '@angular/common';
 import { trigger, state, style, animate, transition } from '@angular/animations';
@@ -49,6 +49,8 @@ export class RecommendationCarouselComponent {
 
   private _recommendedGames: Game_Info[] = [];
 
+  @Output() viewAllClicked = new EventEmitter<string>();
+
   @Input()
   set recommendedGames(value: Game_Info[]) {
     this._recommendedGames = value || [];
@@ -65,6 +67,10 @@ export class RecommendationCarouselComponent {
   handleCardClick(app_id: string) {
     const url = `https://store.steampowered.com/app/${app_id}`;
     window.open(url, '_blank');
+  }
+
+  handleViewAllClick() {
+    this.viewAllClicked.emit('Recommendations')
   }
   
   updateCurrentGame(): void {

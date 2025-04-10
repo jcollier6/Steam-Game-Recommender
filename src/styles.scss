@@ -1,3 +1,25 @@
+@use '@angular/material' as mat;
+
+@include mat.core();
+
+$my-primary: mat.define-palette(mat.$teal-palette);
+$my-accent: mat.define-palette(mat.$amber-palette, A200);
+$my-warn: mat.define-palette(mat.$red-palette);
+
+$my-theme: mat.define-light-theme((
+  color: (
+    primary: $my-primary,
+    accent: $my-accent,
+    warn: $my-warn,
+  ),
+  typography: mat.define-typography-config(),
+  density: 0
+));
+
+@include mat.all-component-themes($my-theme);
+
+
+
 app-root {
     height: 100%;
 }
@@ -16,7 +38,7 @@ router-outlet + * {
     --font-size-h1: clamp(var(--font-size-standard), 1.5vw, var(--font-size-xlarge));
 
     --primary-color: #0E1724;
-    --secondary-color: #19212E;
+    --secondary-color: #202732;
     --accent-color: #596beb;
     --shadow-color: #0000003f;
     --border-radius: 14px;
