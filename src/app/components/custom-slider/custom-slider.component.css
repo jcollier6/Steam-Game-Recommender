@@ -1,0 +1,32 @@
+.slider-container {
+    height: 3rem;
+    background-color: None;
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+}
+  
+.slider-track {
+    height: 4px;
+    background-color: var(--accent-color);
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 0;
+    right: 0;
+    border-radius: 2px;
+}
+  
+.slider-thumb {
+    width: 20px;
+    height: 20px;
+    background-color: #fff;
+    border: 2px solid var(--accent-color);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: -10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
