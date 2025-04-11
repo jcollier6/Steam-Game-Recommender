@@ -23,49 +23,56 @@
                 
                 
             </div>
-            <!-- Filter by language option -->
-            <div class="option-container">
-                <span class="option-title">Filter by Language</span>
-                
-                
-            </div>
 
-            <div class="divider-line"></div>
+            @if (isRecommendationPage) {
+                <div class="divider-line"></div>
 
-            <!-- Weight by Review Count option -->
-            <div class="option-container">
-                <span class="option-title">Weight by Review Count</span>
-                <div class="slider-holder">
-                    <div class="slider-label-holder">
-                        <span class="slider-label">Niche</span>
-                        <span class="slider-label">Popular</span>
+                <!-- Weight by Review Count option -->
+                <div class="option-container">
+                    <span class="option-title">Weight by Review Count</span>
+                    <div class="slider-holder">
+                        <div class="slider-label-holder">
+                            <span class="slider-label">Niche</span>
+                            <span class="slider-label">Popular</span>
+                        </div>
+                        <app-custom-slider [(value)]="reviewCountSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                        <span class="slider-value">{{ reviewCountSliderValue }}%</span>
                     </div>
-                    <app-custom-slider [(value)]="reviewCountSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
-                    <span class="slider-value">{{ reviewCountSliderValue }}%</span>
+                    
                 </div>
-                
-            </div>
-            <!-- Weight by Review Score option -->
-            <div class="option-container">
-                <span class="option-title">Weight by Review Score</span>
-                <div class="slider-holder">
-                    <div class="slider-label-holder">
-                        <span class="slider-label">Negative</span>
-                        <span class="slider-label">Positive</span>
+                <!-- Weight by Review Score option -->
+                <div class="option-container">
+                    <span class="option-title">Weight by Review Score</span>
+                    <div class="slider-holder">
+                        <div class="slider-label-holder">
+                            <span class="slider-label">Negative</span>
+                            <span class="slider-label">Positive</span>
+                        </div>
+                        <app-custom-slider [(value)]="reviewScoreSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                        <span class="slider-value">{{ reviewScoreSliderValue }}%</span>
                     </div>
-                    <app-custom-slider [(value)]="reviewScoreSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
-                    <span class="slider-value">{{ reviewScoreSliderValue }}%</span>
                 </div>
-                
-            </div>
+            }
         </div>
 
-        <div class="game-cards-holder">
-            @for (game of allRecommendedGames; track game) {
-                <app-game-card
-                    [game]="game">
-                </app-game-card>
+        <div class="card-title-holder">
+            @if (isRecommendationPage) {
+                <span class="card-title">Game Recommendations</span> 
+            } @else {
+                @if (isRecentlyPlayedPage) {
+                    <span class="card-title">Recently Played</span>
+                }@else {
+                    <span class="card-title">Games Matching Your Top Tag <span class="highlighted-word">{{ this.cardGroup }}</span></span>
+                }
             }
+            
+            <div class="game-cards-holder">
+                @for (game of allRecommendedGames; track game) {
+                    <app-game-card
+                        [game]="game">
+                    </app-game-card>
+                }
+            </div>
         </div>
     </div>
 } @loading {

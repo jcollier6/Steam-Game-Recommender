@@ -10,7 +10,9 @@
     justify-content: space-between;
     align-items: flex-end;
     height: 10%;
-    padding: 0.5vw;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 0.5rem;
     font-size: var(--font-size-large);
 }
 .view-all-button {
@@ -18,12 +20,13 @@
     color: var(--accent-color);
     background-color: transparent;
     font-weight: bold;
+    padding: 0;
 }
 .view-all-button:hover {
     text-decoration: underline;
 }
 .tag-title {
-    font-weight: 800;
+    font-weight: 600;
 }
 
 .arrows-and-cards-holder{
@@ -48,9 +51,6 @@
     gap: 1rem;
 }
 
-.holder-title {
-    font-size: var(--font-size-h1);
-}
 .view-all-button {
     font-size: var(--font-size-xlarge);
 }

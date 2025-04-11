@@ -21,6 +21,8 @@ export class ViewAllPageComponent implements OnInit {
   priceSliderValue:number = 0;
   reviewCountSliderValue: number = 0;
   reviewScoreSliderValue: number = 0;
+  isRecommendationPage: boolean = false;
+  isRecentlyPlayedPage: boolean = false;
 
   checkBox = new FormGroup({
     isHideF2PChecked: new FormControl(false)
@@ -41,6 +43,11 @@ export class ViewAllPageComponent implements OnInit {
   ngOnInit(): void {
     this.route.queryParamMap.subscribe(params => {
       this.cardGroup = params.get('cardGroup');
+      if(this.cardGroup == 'Recommendations') {
+        this.isRecommendationPage = true;
+      } else if (this.cardGroup == 'Recently Played') {
+        this.isRecentlyPlayedPage = true;
+      }
     });
     
 

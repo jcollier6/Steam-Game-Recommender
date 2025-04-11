@@ -12,6 +12,14 @@
     height: fit-content;
     gap: 1rem;
 }
+.card-title-holder {
+    display: flex;
+    flex-direction: column;
+}
+.card-title {
+    margin-bottom: 0.5rem;
+    margin-left: 0.5rem;
+}
 
 .options-panel {
     /* position: fixed;

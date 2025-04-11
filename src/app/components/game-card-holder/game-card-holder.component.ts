@@ -1,4 +1,4 @@
-import { Component, Input, ElementRef, ViewChild, AfterViewInit, HostListener, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ElementRef, ViewChild, AfterViewInit, HostListener, ChangeDetectorRef } from '@angular/core';
 import { GameCardComponent } from "../game-card/game-card.component";
 import { Game_Info } from '../../services/game.service';
 import { CommonModule } from '@angular/common';
@@ -30,6 +30,8 @@ export class GameCardHolderComponent implements AfterViewInit {
   private _resizeTimeout: any;
   private _maxCards: number = 0;
   private _gameList: Game_Info[] = [];
+
+  @Output() viewAllClicked = new EventEmitter<string>();
 
   @Input() cardHolderTitle: string = '';
 
@@ -82,6 +84,10 @@ export class GameCardHolderComponent implements AfterViewInit {
   @HostListener('window:resize')
   onResize() {
     this.handleResize();
+  }
+
+  handleViewAllClick() {
+    this.viewAllClicked.emit(this.cardHolderTitle)
   }
 
   calculatevisibleCardCount() {

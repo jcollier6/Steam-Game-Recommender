@@ -128,10 +128,6 @@
     padding-bottom: 0.5rem;
     font-size: var(--font-size-large);
 }
-.recommended-word {
-    color: var(--accent-color);
-    font-weight: 600;
-}
 .tags-holder {
     display: flex;
     flex-wrap: wrap;

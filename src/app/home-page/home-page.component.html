@@ -8,13 +8,15 @@
         <app-game-card-holder 
             [gameList]="recentGames"
             [cardHolderTitle]="'Recently Played'"
-            [isRecentTitle]="true">
+            [isRecentTitle]="true"
+            (viewAllClicked)="onViewAllClicked($event)">
         </app-game-card-holder>
 
         @for (tag of tagNames; track tag; let i = $index) {
             <app-game-card-holder 
                 [gameList]="tagGames[i]"
-                [cardHolderTitle]= "tagNames[i]">
+                [cardHolderTitle]= "tagNames[i]"
+                (viewAllClicked)="onViewAllClicked($event)">
             </app-game-card-holder>
         }
     </div>
