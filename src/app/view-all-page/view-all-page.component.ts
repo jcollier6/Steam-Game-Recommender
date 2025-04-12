@@ -25,7 +25,8 @@ export class ViewAllPageComponent implements OnInit {
   isRecentlyPlayedPage: boolean = false;
 
   checkBox = new FormGroup({
-    isHideF2PChecked: new FormControl(false)
+    isHideF2PChecked: new FormControl(false),
+    isIndieOnlyChecked: new FormControl(false)
   });
 
   constructor(

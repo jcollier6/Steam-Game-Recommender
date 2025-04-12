@@ -1,6 +1,36 @@
 @defer (when isReady) {
     <div class="content">
         <div class="options-panel">
+            @if (isRecommendationPage) {
+                <!-- Weight by Review Count option -->
+                <div class="option-container">
+                    <span class="option-title">Review Count Influence</span>
+                    <div class="slider-holder">
+                        <div class="slider-label-holder">
+                            <span class="slider-label">Niche</span>
+                            <span class="slider-label">Popular</span>
+                        </div>
+                        <app-custom-slider [(value)]="reviewCountSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                        <span class="slider-value">{{ reviewCountSliderValue }}%</span>
+                    </div>
+                    
+                </div>
+                <!-- Weight by Review Score option -->
+                <div class="option-container">
+                    <span class="option-title">Review Score Influence</span>
+                    <div class="slider-holder">
+                        <div class="slider-label-holder">
+                            <span class="slider-label">Negative</span>
+                            <span class="slider-label">Positive</span>
+                        </div>
+                        <app-custom-slider [(value)]="reviewScoreSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                        <span class="slider-value">{{ reviewScoreSliderValue }}%</span>
+                    </div>
+                </div>
+
+                <div class="divider-line"></div>
+            }
+
             <!-- Price option -->
             <div class="option-container">
                 <span class="option-title">Filter by Price</span>
@@ -23,36 +53,33 @@
                 
                 
             </div>
-
-            @if (isRecommendationPage) {
-                <div class="divider-line"></div>
-
-                <!-- Weight by Review Count option -->
-                <div class="option-container">
-                    <span class="option-title">Weight by Review Count</span>
-                    <div class="slider-holder">
-                        <div class="slider-label-holder">
-                            <span class="slider-label">Niche</span>
-                            <span class="slider-label">Popular</span>
-                        </div>
-                        <app-custom-slider [(value)]="reviewCountSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
-                        <span class="slider-value">{{ reviewCountSliderValue }}%</span>
-                    </div>
-                    
-                </div>
-                <!-- Weight by Review Score option -->
-                <div class="option-container">
-                    <span class="option-title">Weight by Review Score</span>
-                    <div class="slider-holder">
-                        <div class="slider-label-holder">
-                            <span class="slider-label">Negative</span>
-                            <span class="slider-label">Positive</span>
-                        </div>
-                        <app-custom-slider [(value)]="reviewScoreSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
-                        <span class="slider-value">{{ reviewScoreSliderValue }}%</span>
-                    </div>
-                </div>
-            }
+            <!-- Filter to only Indie games -->
+            <div class="option-container">
+                <span class="option-title">Indie Filter</span>
+                <label class="custom-checkbox">
+                    <input type="checkbox" formControlName="isIndieOnlyChecked" />
+                    <span class="checkmark"></span>
+                    Indie Games Only
+                  </label>
+            </div>
+            <!-- Filter by Release Year -->
+            <div class="option-container">
+                <span class="option-title">Filter by Release Year</span>
+                <label class="custom-checkbox">
+                    <input type="checkbox" formControlName="isIndieOnlyChecked" />
+                    <span class="checkmark"></span>
+                    Placeholder
+                </label>
+            </div>
+            <!-- Filter by Platform -->
+            <div class="option-container">
+                <span class="option-title">Filter by Platform</span>
+                <label class="custom-checkbox">
+                    <input type="checkbox" formControlName="isIndieOnlyChecked" />
+                    <span class="checkmark"></span>
+                    Placeholder
+                </label>
+            </div>
         </div>
 
         <div class="card-title-holder">
