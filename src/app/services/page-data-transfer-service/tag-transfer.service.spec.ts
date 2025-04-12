@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { GameService } from './game.service';
+import { TagTransferService } from './tag-transfer.service';
 
-describe('GameService', () => {
-  let service: GameService;
+describe('TagTransferService', () => {
+  let service: TagTransferService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(GameService);
+    service = TestBed.inject(TagTransferService);
   });
 
   it('should be created', () => {

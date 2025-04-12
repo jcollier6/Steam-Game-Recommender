@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { GameService } from './services/game.service';
+import { GameService } from './services/game-service/game.service';
 import { HttpClientModule } from '@angular/common/http';
 import { RouterModule } from '@angular/router';
 import { BottomInfoBarComponent } from "./components/bottom-info-bar/bottom-info-bar.component";

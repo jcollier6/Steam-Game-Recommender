@@ -1,6 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { GameCardComponent } from "../components/game-card/game-card.component";
-import { GameService, Game_Info } from '../services/game.service';
+import { GameService, Game_Info } from '../services/game-service/game.service';
 import { ShellLoaderComponent } from "../components/shell-loader/shell-loader.component";
 import { ActivatedRoute } from '@angular/router';
 import { CustomSliderComponent } from "../components/custom-slider/custom-slider.component";

@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter, ElementRef, ViewChild, AfterViewInit, HostListener, ChangeDetectorRef } from '@angular/core';
 import { GameCardComponent } from "../game-card/game-card.component";
-import { Game_Info } from '../../services/game.service';
+import { Game_Info } from '../../services/game-service/game.service';
 import { CommonModule } from '@angular/common';
 
 @Component({

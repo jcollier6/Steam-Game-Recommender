@@ -1,5 +1,5 @@
 import { Component, Input, ElementRef, ViewChild, Renderer2 } from '@angular/core';
-import { Game_Info } from '../../services/game.service';
+import { Game_Info } from '../../services/game-service/game.service';
 import { CommonModule } from '@angular/common';
 
 
