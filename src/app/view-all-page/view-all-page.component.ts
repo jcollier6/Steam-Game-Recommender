@@ -4,13 +4,13 @@ import { GameService, Game_Info } from '../services/game-service/game.service';
 import { ShellLoaderComponent } from "../components/shell-loader/shell-loader.component";
 import { ActivatedRoute } from '@angular/router';
 import { CustomSliderComponent } from "../components/custom-slider/custom-slider.component";
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup } from '@angular/forms';
 
 
 @Component({
   selector: 'view-all',
   standalone: true,
-  imports: [ GameCardComponent, ShellLoaderComponent, CustomSliderComponent, ReactiveFormsModule ],
+  imports: [ GameCardComponent, ShellLoaderComponent, CustomSliderComponent ],
   templateUrl: './view-all-page.component.html',
   styleUrl: './view-all-page.component.css'
 })
@@ -23,6 +23,9 @@ export class ViewAllPageComponent implements OnInit {
   reviewScoreSliderValue: number = 0;
   isRecommendationPage: boolean = false;
   isRecentlyPlayedPage: boolean = false;
+  topTagNames: string[] = [];
+  selectedTags: Set<string> = new Set();
+  filteredTags: string[] = [];
 
   checkBox = new FormGroup({
     isHideF2PChecked: new FormControl(false),
@@ -33,7 +36,16 @@ export class ViewAllPageComponent implements OnInit {
     private gameService: GameService,
     private route: ActivatedRoute,
     private cdRef: ChangeDetectorRef
-  ) {}
+  ) {
+    const savedTags = localStorage.getItem('selectedTags');
+    if (savedTags) {
+      this.selectedTags = new Set(JSON.parse(savedTags));
+    }
+    const savedTopTags = localStorage.getItem('topTagNames');
+    if (savedTopTags) {
+      this.topTagNames = (JSON.parse(savedTopTags));
+    }
+  }
 
 
   ngAfterViewInit(): void {
@@ -42,6 +54,8 @@ export class ViewAllPageComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.filteredTags = this.topTagNames.slice(0, 5);
+
     this.route.queryParamMap.subscribe(params => {
       this.cardGroup = params.get('cardGroup');
       if(this.cardGroup == 'Recommendations') {
@@ -57,8 +71,33 @@ export class ViewAllPageComponent implements OnInit {
     });
   }
 
+  filterTags(searchTerm: string): void { 
+    if (!searchTerm) { 
+      // If no search, revert to the initial 5 tags. 
+      this.filteredTags = this.topTagNames.slice(0, 5); 
+    } else { 
+      // Filter tags loosely based on the search text (case-insensitive) and take the first five 
+      this.filteredTags = this.topTagNames .filter(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) .slice(0, 5); } 
+  }
 
+  clearTagSearch(inputElement: HTMLInputElement): void {
+    inputElement.value = '';
+    this.filterTags('');
+  }
 
+  onCheckboxChange(tag: string, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const checked = input?.checked ?? false;
 
+    if (checked) {
+      this.selectedTags.add(tag);
+    } else {
+      this.selectedTags.delete(tag);
+    }
+    console.log([...this.selectedTags]);
+
+    // Save to localStorage
+    localStorage.setItem('selectedTags', JSON.stringify([...this.selectedTags]));
+  }
   
 }

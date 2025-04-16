@@ -40,7 +40,7 @@
     padding-bottom: 0.5rem;
 }
 .option-title {
-    width: 100%;
+    width: inherit;
     background-color: var(--secondary-color);
     padding: 0.5rem;
 }
@@ -110,4 +110,34 @@
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
 }
-  
+
+.tag-search-wrapper {
+    position: relative;
+    width: calc(100% - 2rem);
+    margin: 0 1rem;
+}
+.tag-search-box {
+    color: inherit;
+    background-color: transparent;
+    border: 2px solid var(--secondary-color);
+    border-radius: var(--border-radius);
+    padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+    outline: none;
+    width: inherit;
+}
+.tag-search-box::placeholder {
+    opacity: 0.8;
+}
+.clear-button {
+    position: absolute;
+    top: 0.1rem;
+    right: 0.25rem;
+    background: none;
+    font-size: 1.25rem;
+    color: var(--secondary-color);
+    cursor: pointer;
+    padding: 0;
+}
+.clear-button:hover {
+    color: var(--accent-color);
+}

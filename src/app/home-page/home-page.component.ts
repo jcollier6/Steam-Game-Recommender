@@ -1,12 +1,11 @@
 import { Component, ChangeDetectorRef, OnInit } from '@angular/core';
 import { GameService, Game_Info } from '../services/game-service/game.service';
 import { HttpClientModule } from '@angular/common/http';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { RecommendationCarouselComponent } from '../components/recommendation-carousel/recommendation-carousel.component';
 import { GameCardHolderComponent } from "../components/game-card-holder/game-card-holder.component";
 import { ShellLoaderComponent } from "../components/shell-loader/shell-loader.component";
-import { Router } from '@angular/router';
 
 @Component({
   selector: 'home-page',
@@ -53,6 +52,7 @@ export class HomePageComponent implements OnInit {
   }
 
   onViewAllClicked(cardGroup: string): void {
+    localStorage.setItem('topTagNames', JSON.stringify([...this.tagNames]));
     this.router.navigate(['/view-all'], { queryParams: { cardGroup }});
   }
 }

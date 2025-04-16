@@ -33,6 +33,8 @@ export class SignInComponent {
     
     onSubmit() {
       if (this.steamId.trim()) {
+        localStorage.clear();
+
         console.log('Steam ID submitted:', this.steamId);
   
         const url = 'http://localhost:8000/submit-steam-id'; 

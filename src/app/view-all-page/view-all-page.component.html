@@ -39,19 +39,11 @@
                     <span class="slider-value">Value: {{ priceSliderValue }}</span>
                 </div>
                 <div class="divider-line"></div>
-                <form [formGroup]="checkBox">
-                    <label class="custom-checkbox">
-                      <input type="checkbox" formControlName="isHideF2PChecked" />
-                      <span class="checkmark"></span>
-                      Hide free to play
-                    </label>
-                </form>
-            </div>
-            <!-- Filter by tag option -->
-            <div class="option-container">
-                <span class="option-title">Filter by Tag</span>
-                
-                
+                <label class="custom-checkbox">
+                    <input type="checkbox" formControlName="isHideF2PChecked" />
+                    <span class="checkmark"></span>
+                    Hide free to play
+                </label>
             </div>
             <!-- Filter to only Indie games -->
             <div class="option-container">
@@ -61,6 +53,39 @@
                     <span class="checkmark"></span>
                     Indie Games Only
                   </label>
+            </div>
+            <!-- Filter by tag option -->
+            <div class="option-container">
+                <span class="option-title">Filter by Tag</span>
+                
+                <div class="tag-search-wrapper">
+                    <input #tagSearch 
+                    type="text" 
+                    placeholder="Search tags..." 
+                    (keyup)="filterTags(tagSearch.value)" 
+                    class="tag-search-box" />
+
+                    @if (tagSearch.value) {
+                        <button
+                        class="clear-button"
+                        type="button"
+                        (click)="clearTagSearch(tagSearch)">
+                        ×
+                        </button>
+                    }
+                </div>
+
+                <!-- Display filtered tags using @for -->
+                @for (tag of filteredTags; track tag) {
+                    <label class="custom-checkbox">
+                    <input
+                        type="checkbox"
+                        [checked]="selectedTags.has(tag)"
+                        (change)="onCheckboxChange(tag, $event)" />
+                    <span class="checkmark"></span>
+                    {{ tag }}
+                    </label>
+                }
             </div>
             <!-- Filter by Release Year -->
             <div class="option-container">
