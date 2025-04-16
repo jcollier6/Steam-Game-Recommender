@@ -50,10 +50,9 @@ def query_db(query, params=None, dictionary=True):
 
 
 
-@app.get("/get_tags")
-def get_tags():
-    records = query_db("SELECT * FROM steam_game_tags")
-    return records
+@app.get("/all_tags")
+def get_all_tags():
+    return all_unique_tags
 
 @app.get("/recommended_games")
 def get_recommended_games():
@@ -82,7 +81,7 @@ def get_top_tag_games():
 
 
 def initialize_global_game_data():
-    global df_review_data, game_details_by_app_id, app_id_to_tags
+    global df_review_data, game_details_by_app_id, app_id_to_tags, all_unique_tags
 
     print("⚙️ Initializing global game data...")
 
@@ -122,7 +121,9 @@ def initialize_global_game_data():
         try:
             app_id = str(row["app_id"])
             tags_json = json.loads(row["tags"])
-            tag_dict[app_id] = set(tags_json.get("tags", []))
+            tag_set = set(tags_json.get("tags", []))
+            tag_dict[app_id] = tag_set
+            all_unique_tags.update(tag_set)
         except (TypeError, json.JSONDecodeError):
             tag_dict[app_id] = set()
     app_id_to_tags = tag_dict
@@ -172,6 +173,7 @@ df_user_owns = pd.DataFrame()
 df_scores = pd.DataFrame()
 API_KEY = ""
 steam_id = None 
+all_unique_tags = set()
 
 # --- Helper Functions ---
 def get_API_key():

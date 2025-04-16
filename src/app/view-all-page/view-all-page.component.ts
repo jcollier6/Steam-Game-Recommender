@@ -26,6 +26,11 @@ export class ViewAllPageComponent implements OnInit {
   topTagNames: string[] = [];
   selectedTags: Set<string> = new Set();
   filteredTags: string[] = [];
+  showMoreOrLess: string = 'Show more';
+  tagDisplayLimit: number = 5;
+  allTags: string[] = [];
+  lastSearchTerm: string = '';
+  noSearchableTags: boolean = false;
 
   checkBox = new FormGroup({
     isHideF2PChecked: new FormControl(false),
@@ -65,19 +70,53 @@ export class ViewAllPageComponent implements OnInit {
       }
     });
     
-
+    this.gameService.getAllTags().subscribe((data) => {
+      this.allTags = data;
+    });
     this.gameService.getRecommendedGames().subscribe((data) => {
       this.allRecommendedGames = data;
     });
   }
 
-  filterTags(searchTerm: string): void { 
+  filterTags(searchTerm: string): void {
+    this.lastSearchTerm = searchTerm; 
     if (!searchTerm) { 
-      // If no search, revert to the initial 5 tags. 
-      this.filteredTags = this.topTagNames.slice(0, 5); 
-    } else { 
-      // Filter tags loosely based on the search text (case-insensitive) and take the first five 
-      this.filteredTags = this.topTagNames .filter(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) .slice(0, 5); } 
+      const checkedTags = Array.from(this.selectedTags);
+      const orderedTags = new Set<string>();
+
+      for (const tag of checkedTags) {
+        orderedTags.add(tag);
+      }
+      for (const tag of this.topTagNames) {
+        orderedTags.add(tag);
+      }
+      for (const tag of this.allTags) {
+        orderedTags.add(tag);
+      }
+      this.filteredTags = Array.from(orderedTags).slice(0, this.tagDisplayLimit);
+    } 
+    else { 
+      const search = searchTerm.toLowerCase();
+      const startsWithMatches = this.allTags.filter(tag =>
+        tag.toLowerCase().startsWith(search)
+      );
+      const includesMatches = this.allTags.filter(tag =>
+        tag.toLowerCase().includes(search) && !tag.toLowerCase().startsWith(search)
+      );
+      const combined = Array.from(new Set([...startsWithMatches, ...includesMatches]));
+      this.filteredTags = combined.slice(0, this.tagDisplayLimit); 
+
+      if(this.filteredTags.length == 0){
+        this.showMoreOrLess = 'No matching tags';
+        this.noSearchableTags = true;
+      }
+    } 
+    
+    if(this.filteredTags.length != 0){
+      this.noSearchableTags = false;
+      if(this.tagDisplayLimit == 5){this.showMoreOrLess = 'Show more';}
+      else{this.showMoreOrLess = 'Show less';}
+    }
   }
 
   clearTagSearch(inputElement: HTMLInputElement): void {
@@ -94,10 +133,16 @@ export class ViewAllPageComponent implements OnInit {
     } else {
       this.selectedTags.delete(tag);
     }
-    console.log([...this.selectedTags]);
 
-    // Save to localStorage
     localStorage.setItem('selectedTags', JSON.stringify([...this.selectedTags]));
+  }
+
+  toggleTagDisplayLimit(): void {
+    if(!this.noSearchableTags){
+      this.tagDisplayLimit = this.tagDisplayLimit === 5 ? 15 : 5;
+      this.showMoreOrLess = this.showMoreOrLess === 'Show more' ? 'Show less' : 'Show more';
+    }
+    this.filterTags(this.lastSearchTerm)
   }
   
 }

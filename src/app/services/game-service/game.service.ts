@@ -20,6 +20,10 @@ export class GameService {
 
   constructor(private httpClient: HttpClient) {}
 
+  getAllTags(): Observable<string[]> {
+    return this.httpClient.get<string[]>(`${this.apiUrl}/all_tags`);
+  }
+
   getRecommendedGames(): Observable<Game_Info[]> {
     return this.httpClient.get<Game_Info[]>(`${this.apiUrl}/recommended_games`);
   }
