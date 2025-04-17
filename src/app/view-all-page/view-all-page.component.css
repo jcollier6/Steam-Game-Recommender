@@ -124,7 +124,8 @@
     border-radius: var(--border-radius);
     padding: 0.25rem 1.5rem 0.25rem 0.5rem;
     outline: none;
-    width: inherit;
+    width: 100%;
+    box-sizing: border-box;
 }
 .tag-search-box::placeholder {
     opacity: 0.8;
@@ -149,4 +150,7 @@
     padding: 0.25rem 0;
     border-radius: var(--border-radius);
     background-color: var(--secondary-color);
+}
+.show-more:disabled {
+    cursor: default;
 }

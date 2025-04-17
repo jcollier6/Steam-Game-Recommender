@@ -87,7 +87,7 @@
                     </label>
                 }
 
-                <button (click)="toggleTagDisplayLimit()" class="show-more">{{ showMoreOrLess }}</button>
+                <button (click)="toggleTagDisplayLimit()" class="show-more" [disabled]="noSearchableTags">{{ showMoreOrLess }}</button>
             </div>
             <!-- Filter by Release Year -->
             <div class="option-container">

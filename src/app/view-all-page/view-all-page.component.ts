@@ -138,10 +138,8 @@ export class ViewAllPageComponent implements OnInit {
   }
 
   toggleTagDisplayLimit(): void {
-    if(!this.noSearchableTags){
-      this.tagDisplayLimit = this.tagDisplayLimit === 5 ? 15 : 5;
-      this.showMoreOrLess = this.showMoreOrLess === 'Show more' ? 'Show less' : 'Show more';
-    }
+    this.tagDisplayLimit = this.tagDisplayLimit === 5 ? 15 : 5;
+    this.showMoreOrLess = this.showMoreOrLess === 'Show more' ? 'Show less' : 'Show more';
     this.filterTags(this.lastSearchTerm)
   }
   
