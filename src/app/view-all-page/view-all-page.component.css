@@ -22,9 +22,6 @@
 }
 
 .options-panel {
-    /* position: fixed;
-    left: 20vw;
-    top: 20vw; */
     display: flex;
     flex-direction: column;
     min-width: 15rem;
@@ -89,8 +86,8 @@
     display: none; /* hide native checkbox */
 }
 .checkmark {
-    width: 16px;           
-    height: 16px;
+    min-width: 16px;           
+    min-height: 16px;
     border: 2px solid var(--secondary-color);  
     border-radius: 0.25rem;
     margin-right: 0.5rem;
@@ -133,7 +130,7 @@
 .clear-button {
     position: absolute;
     top: 0.1rem;
-    right: 0.25rem;
+    right: 0.5rem;
     background: none;
     font-size: 1.25rem;
     color: var(--secondary-color);
@@ -144,7 +141,7 @@
     color: var(--accent-color);
 }
 
-
+/* show more button */
 .show-more {
     margin: 0 1rem;
     padding: 0.25rem 0;
