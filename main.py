@@ -8,6 +8,7 @@ from collections import Counter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+import logging
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,6 +25,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
+)
+
+# logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%m-%d %H:%M:%S"
 )
 
 # --- Database Connection Helpers ---
@@ -60,7 +68,7 @@ def get_recommended_games():
         data = get_games_additional_info(df_recommended_games)
         return JSONResponse(content=data)  
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={"/recommended_games error": str(e)}, status_code=500)
 
 @app.get("/recently_played")
 def get_recently_played():
@@ -69,7 +77,7 @@ def get_recently_played():
         data = get_games_additional_info(recently_played)
         return JSONResponse(content=data)  
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={"/recently_played error": str(e)}, status_code=500)
 
 @app.get("/top_tag_games")
 def get_top_tag_games():
@@ -77,13 +85,21 @@ def get_top_tag_games():
         data = get_user_top_tags_games()
         return JSONResponse(content=data)  
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={"/top_tag_games error": str(e)}, status_code=500)
+
+@app.get("/steam_tag_counts")
+def get_steam_tag_counts():
+    try:
+        data = get_steam_tag_counts()
+        return JSONResponse(content=data)  
+    except Exception as e:
+        return JSONResponse(content={"/steam_tag_counts error": str(e)}, status_code=500)
 
 
 def initialize_global_game_data():
     global df_review_data, game_details_by_app_id, app_id_to_tags, all_unique_tags
 
-    print("⚙️ Initializing global game data...")
+    logging.info("⚙️ Initializing global game data...")
 
     # Load reviews
     review_data = query_db("SELECT app_id, bayesian_score FROM steam_game_reviews;")
@@ -130,7 +146,7 @@ def initialize_global_game_data():
 
     get_API_key() 
 
-    print("✅ Global game data ready.")
+    logging.info("✅ Global game data ready.")
 
 
 # --- Steam ID Request ---
@@ -149,16 +165,16 @@ async def submit_steam_id(request: SteamIdRequest):
         raise HTTPException(status_code=400, detail=str(e))
     
 async def process_steam_id(steam_id: str):
-    print(f"Processing Steam ID: {steam_id}")
+    logging.info(f"Processing Steam ID: {steam_id}")
     try: 
         user_data = is_valid_id(steam_id) 
         prepare_user_info(user_data)  
         calculate_recommended_games()  
-        print(f"Steam ID {steam_id} processing complete!")
+        logging.info(f"Steam ID {steam_id} processing complete!")
         return {"status": "success", "message": f"Processed {steam_id}"}
 
     except ValueError as e:
-        print(f"Error processing Steam ID {steam_id}: {e}")
+        logging.info(f"Error processing Steam ID {steam_id}: {e}")
         return {"status": "error", "message": str(e)}
 
 
@@ -182,7 +198,7 @@ def get_API_key():
             global API_KEY
             API_KEY = file.read().strip()
     except FileNotFoundError:
-        print(f"Environment file not found at {'environment.txt'}.")
+        logging.error(f"Environment file not found at {'environment.txt'}.")
 
 
 def is_valid_id(steam_id):
@@ -337,4 +353,17 @@ def get_user_top_tags_games() :
 
 
 
-
+def get_steam_tag_counts() -> dict[str, int]:
+    """
+    Returns a dict mapping each tag name to its game_count,
+    e.g. {"Action": 1234, "RPG": 567, …}
+    """
+    try:
+        rows = query_db(
+            "SELECT tag, game_count FROM steam_tag_summary",
+            dictionary=True
+        )
+        return {row["tag"]: row["game_count"] for row in rows}
+    except Exception as err:
+        logging.error(f"Failed to fetch tag stats: {err}")
+        return {}

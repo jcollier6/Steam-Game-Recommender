@@ -39,4 +39,8 @@ export class GameService {
   getTopTagGames(): Observable<Record<string, Game_Info[]>> {
     return this.httpClient.get<Record<string, Game_Info[]>>(`${this.apiUrl}/top_tag_games`);
   }
+
+  getSteamTagCounts(): Observable<Record<string,number>> {
+    return this.httpClient.get<Record<string,number>>(`${this.apiUrl}/steam_tag_counts`);
+  }
 }

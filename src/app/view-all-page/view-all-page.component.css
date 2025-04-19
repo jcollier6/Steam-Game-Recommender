@@ -2,7 +2,7 @@
     display: flex;
     gap: 1rem;
     flex-direction: row;
-    max-width: 93rem;
+    max-width: 100rem;
     padding: 2rem;
 }
 
@@ -24,7 +24,7 @@
 .options-panel {
     display: flex;
     flex-direction: column;
-    min-width: 15rem;
+    min-width: 18rem;
     gap: 1rem;
 }
 .option-container {
@@ -74,9 +74,31 @@
     font-size: var(--font-size-small);
 }
 
-/* custom checkbox */
+
+/* Tags in filter box */
+.filtered-tags {
+    display: flex;
+    margin-right: 1rem;
+}
+.tag-count {
+    display: flex;
+    width: fit-content;
+    height: fit-content;
+    align-self: center;
+    font-size: var(--font-size-standard);
+    background-color: var(--secondary-color);
+    border-radius: var(--border-radius);
+    padding: 0.1rem 0.4rem;
+}
+.top-tag-star {
+    display: flex;
+    align-items: center;
+    margin-left: 0.25rem;
+}
+/* custom checkbox for filters*/
 .custom-checkbox {
     display: inline-flex;
+    width: 100%;
     align-items: center;
     cursor: pointer;
     user-select: none;
@@ -106,6 +128,43 @@
     border: solid white;
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
+}
+/* exclude button */
+.exclude-button {
+    position: absolute;    
+    right: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.5rem;
+    height: 1.25rem;
+    border: none;
+    border-radius: 0.25rem;
+    background: var(--secondary-color);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    /* create a positioning context for the ::before */
+    position: relative;
+  }
+  
+  .exclude-button::before {
+    content: "";
+    display: block;        
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 0.6rem;
+    height: 0.15rem;
+    background-color: white;
+  }
+  
+  .filtered-tags:hover .exclude-button {
+    opacity: 1;
+  }
+  
+.exclude-button:hover {
+    background-color: var(--accent-color);
 }
 
 /* tag search box */
@@ -140,6 +199,7 @@
 .clear-button:hover {
     color: var(--accent-color);
 }
+
 
 /* show more button */
 .show-more {

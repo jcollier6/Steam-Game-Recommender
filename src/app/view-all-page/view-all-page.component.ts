@@ -31,6 +31,7 @@ export class ViewAllPageComponent implements OnInit {
   allTags: string[] = [];
   lastSearchTerm: string = '';
   noSearchableTags: boolean = false;
+  steamTagCounts: Record<string,number> = {};
 
   checkBox = new FormGroup({
     isHideF2PChecked: new FormControl(false),
@@ -76,48 +77,77 @@ export class ViewAllPageComponent implements OnInit {
     this.gameService.getRecommendedGames().subscribe((data) => {
       this.allRecommendedGames = data;
     });
+    this.gameService.getSteamTagCounts().subscribe(counts => {
+      this.steamTagCounts = counts;
+    });
   }
 
   filterTags(searchTerm: string): void {
-    this.lastSearchTerm = searchTerm; 
-    if (!searchTerm) { 
-      const checkedTags = Array.from(this.selectedTags);
-      const orderedTags = new Set<string>();
+  this.lastSearchTerm = searchTerm;
+  const limit       = this.tagDisplayLimit;
+  const searchLower = searchTerm.toLowerCase();
 
-      for (const tag of checkedTags) {
-        orderedTags.add(tag);
-      }
-      for (const tag of this.topTagNames) {
-        orderedTags.add(tag);
-      }
-      for (const tag of this.allTags) {
-        orderedTags.add(tag);
-      }
-      this.filteredTags = Array.from(orderedTags).slice(0, this.tagDisplayLimit);
-    } 
-    else { 
-      const search = searchTerm.toLowerCase();
-      const startsWithMatches = this.allTags.filter(tag =>
-        tag.toLowerCase().startsWith(search)
-      );
-      const includesMatches = this.allTags.filter(tag =>
-        tag.toLowerCase().includes(search) && !tag.toLowerCase().startsWith(search)
-      );
-      const combined = Array.from(new Set([...startsWithMatches, ...includesMatches]));
-      this.filteredTags = combined.slice(0, this.tagDisplayLimit); 
+  // 1) Pool = allTags matching the search, or allTags if empty
+  const pool = searchTerm
+    ? this.allTags.filter(t => t.toLowerCase().includes(searchLower))
+    : this.allTags;
 
-      if(this.filteredTags.length == 0){
-        this.showMoreOrLess = 'No matching tags';
-        this.noSearchableTags = true;
-      }
-    } 
-    
-    if(this.filteredTags.length != 0){
-      this.noSearchableTags = false;
-      if(this.tagDisplayLimit == 5){this.showMoreOrLess = 'Show more';}
-      else{this.showMoreOrLess = 'Show less';}
+  const result: string[] = [];
+  const seen = new Set<string>();
+
+  // 2) Checked tags first—but only those matching the search
+  for (const tag of this.selectedTags) {
+    if (result.length >= limit) break;
+    if (searchTerm && !tag.toLowerCase().includes(searchLower)) {
+      continue;
+    }
+    if (!seen.has(tag)) {
+      result.push(tag);
+      seen.add(tag);
     }
   }
+
+  // 3) Then topTagNames (only if in pool)
+  for (const tag of this.topTagNames) {
+    if (result.length >= limit) break;
+    if (!seen.has(tag) && pool.includes(tag)) {
+      result.push(tag);
+      seen.add(tag);
+    }
+  }
+
+  // 4) Fill the rest up to limit by highest steamTagCounts
+  if (result.length < limit) {
+    const needed = limit - result.length;
+    const topK: string[] = [];
+
+    for (const tag of pool) {
+      if (seen.has(tag)) continue;
+      const cnt = this.steamTagCounts[tag] || 0;
+      let pos = 0;
+      while (pos < topK.length &&
+             (this.steamTagCounts[topK[pos]] || 0) >= cnt) {
+        pos++;
+      }
+      if (pos < needed) {
+        topK.splice(pos, 0, tag);
+        if (topK.length > needed) topK.length = needed;
+      }
+    }
+
+    result.push(...topK);
+  }
+
+  this.filteredTags = result;
+
+  // 5) Update UI flags
+  this.noSearchableTags = result.length === 0;
+  if (!this.noSearchableTags) {
+    this.showMoreOrLess =
+      this.tagDisplayLimit === result.length ? 'Show more' : 'Show less';
+  }
+}
+
 
   clearTagSearch(inputElement: HTMLInputElement): void {
     inputElement.value = '';
@@ -142,5 +172,12 @@ export class ViewAllPageComponent implements OnInit {
     this.showMoreOrLess = this.showMoreOrLess === 'Show more' ? 'Show less' : 'Show more';
     this.filterTags(this.lastSearchTerm)
   }
+
+  getTagCount(tag: string): number {
+    return this.steamTagCounts[tag] ?? 0;
+  }
   
+  excludeTag(tag: string): void {
+    return
+  }
 }

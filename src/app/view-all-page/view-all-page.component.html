@@ -75,16 +75,29 @@
                     }
                 </div>
 
-                <!-- Display filtered tags using @for -->
+                <!-- Display filtered tags -->
                 @for (tag of filteredTags; track tag) {
-                    <label class="custom-checkbox">
-                    <input
-                        type="checkbox"
-                        [checked]="selectedTags.has(tag)"
-                        (change)="onCheckboxChange(tag, $event)" />
-                    <span class="checkmark"></span>
-                    {{ tag }}
-                    </label>
+                    <div class="filtered-tags">
+                        <label class="custom-checkbox">
+                        <input
+                            type="checkbox"
+                            [checked]="selectedTags.has(tag)"
+                            (change)="onCheckboxChange(tag, $event)" />
+                        <span class="checkmark"></span>
+                        {{ tag }} 
+                        @if(topTagNames.includes(tag)) {
+                            <span class="top-tag-star" title="One of your top 5 tags">★</span>
+                        }
+                        </label>
+                        <!-- exclude button -->
+                        <button class="exclude-button"
+                            title="Exclude tag"
+                            (click)="excludeTag(tag)">
+                        </button>
+                        <div class="tag-count">
+                            {{ getTagCount(tag) }}
+                        </div>
+                    </div>
                 }
 
                 <button (click)="toggleTagDisplayLimit()" class="show-more" [disabled]="noSearchableTags">{{ showMoreOrLess }}</button>
