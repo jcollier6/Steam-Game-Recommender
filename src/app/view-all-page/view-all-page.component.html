@@ -79,23 +79,23 @@
                 @for (tag of filteredTags; track tag) {
                     <div class="filtered-tags">
                         <label class="custom-checkbox">
-                        <input
-                            type="checkbox"
-                            [checked]="selectedTags.has(tag)"
-                            (change)="onCheckboxChange(tag, $event)" />
-                        <span class="checkmark"></span>
-                        {{ tag }} 
-                        @if(topTagNames.includes(tag)) {
-                            <span class="top-tag-star" title="One of your top 5 tags">★</span>
-                        }
+                            <input
+                                type="checkbox"
+                                [checked]="selectedTags.has(tag)"
+                                (change)="onCheckboxChange(tag, $event)" />
+                            <span class="checkmark"></span>
+                            <span [class.crossed-out]="excludedTags.has(tag)">{{ tag }}</span>
+                            @if(topTagNames.includes(tag)) {
+                                <span class="top-tag-star" title="One of your top 5 tags">★</span>
+                            }
                         </label>
                         <!-- exclude button -->
                         <button class="exclude-button"
                             title="Exclude tag"
-                            (click)="excludeTag(tag)">
+                            (click)="toggleExclude(tag)">
                         </button>
                         <div class="tag-count">
-                            {{ getTagCount(tag) }}
+                            {{ excludedTags.has(tag) ? 'Excluded' : getTagCount(tag) }}
                         </div>
                     </div>
                 }

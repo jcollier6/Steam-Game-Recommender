@@ -145,9 +145,8 @@
     transition: opacity 0.2s ease-in-out;
     /* create a positioning context for the ::before */
     position: relative;
-  }
-  
-  .exclude-button::before {
+}
+.exclude-button::before {
     content: "";
     display: block;        
     position: absolute;
@@ -157,15 +156,18 @@
     width: 0.6rem;
     height: 0.15rem;
     background-color: white;
-  }
-  
-  .filtered-tags:hover .exclude-button {
+} 
+.filtered-tags:hover .exclude-button {
     opacity: 1;
-  }
-  
+} 
 .exclude-button:hover {
     background-color: var(--accent-color);
 }
+.crossed-out {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
 
 /* tag search box */
 .tag-search-wrapper {

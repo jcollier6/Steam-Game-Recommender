@@ -32,6 +32,7 @@ export class ViewAllPageComponent implements OnInit {
   lastSearchTerm: string = '';
   noSearchableTags: boolean = false;
   steamTagCounts: Record<string,number> = {};
+  excludedTags: Set<string> = new Set<string>();
 
   checkBox = new FormGroup({
     isHideF2PChecked: new FormControl(false),
@@ -84,7 +85,7 @@ export class ViewAllPageComponent implements OnInit {
 
   filterTags(searchTerm: string): void {
   this.lastSearchTerm = searchTerm;
-  const limit       = this.tagDisplayLimit;
+  const limit = this.tagDisplayLimit;
   const searchLower = searchTerm.toLowerCase();
 
   // 1) Pool = allTags matching the search, or allTags if empty
@@ -107,7 +108,19 @@ export class ViewAllPageComponent implements OnInit {
     }
   }
 
-  // 3) Then topTagNames (only if in pool)
+  // 3) Then excludedTags but only those matching the search
+  for (const tag of this.excludedTags) {
+    if (result.length >= limit) break;
+    if (searchTerm && !tag.toLowerCase().includes(searchLower)) {
+      continue;
+    }
+    if (!seen.has(tag)) {
+      result.push(tag);
+      seen.add(tag);
+    }
+  }
+
+  // 4) Then topTagNames (only if in pool)
   for (const tag of this.topTagNames) {
     if (result.length >= limit) break;
     if (!seen.has(tag) && pool.includes(tag)) {
@@ -116,7 +129,7 @@ export class ViewAllPageComponent implements OnInit {
     }
   }
 
-  // 4) Fill the rest up to limit by highest steamTagCounts
+  // 5) Fill the rest up to limit by highest steamTagCounts
   if (result.length < limit) {
     const needed = limit - result.length;
     const topK: string[] = [];
@@ -139,12 +152,13 @@ export class ViewAllPageComponent implements OnInit {
   }
 
   this.filteredTags = result;
-
-  // 5) Update UI flags
   this.noSearchableTags = result.length === 0;
-  if (!this.noSearchableTags) {
-    this.showMoreOrLess =
-      this.tagDisplayLimit === result.length ? 'Show more' : 'Show less';
+
+  // Update show more button accordingly
+  if (this.noSearchableTags) {
+    this.showMoreOrLess = 'No matching tags';
+  } else {
+    this.showMoreOrLess = this.tagDisplayLimit === 5 ? 'Show more' : 'Show less';
   }
 }
 
@@ -160,6 +174,7 @@ export class ViewAllPageComponent implements OnInit {
 
     if (checked) {
       this.selectedTags.add(tag);
+      this.excludedTags.delete(tag);
     } else {
       this.selectedTags.delete(tag);
     }
@@ -177,7 +192,13 @@ export class ViewAllPageComponent implements OnInit {
     return this.steamTagCounts[tag] ?? 0;
   }
   
-  excludeTag(tag: string): void {
-    return
+  toggleExclude(tag: string): void {
+    if (this.excludedTags.has(tag)) {
+      this.excludedTags.delete(tag);
+    } else {
+      this.excludedTags.add(tag);
+      this.selectedTags.delete(tag);
+    }
   }
+  
 }
