@@ -6,6 +6,7 @@ import requests
 import mysql.connector
 from requests_html import AsyncHTMLSession
 import asyncio
+import logging, sys
 
 
 # ---- MySQL CONNECTION ----
@@ -23,6 +24,26 @@ tag_upserts: list[tuple[int, str]] = []
 
 # holds all reviews for batch upserts
 review_upserts: list[tuple[int,int,int,int]] = []
+
+# 1) Create two handlers: one for INFO→stdout, one for WARNING+→stderr
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.INFO)
+stderr_handler = logging.StreamHandler(sys.stderr)
+stderr_handler.setLevel(logging.WARNING)
+
+# 2) Use the same formatter (with level name in it)
+fmt = "%(asctime)s [%(levelname)s] %(message)s"
+formatter = logging.Formatter(fmt)
+stdout_handler.setFormatter(formatter)
+stderr_handler.setFormatter(formatter)
+
+# 3) Configure root logger
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)        # capture everything
+root.handlers.clear()              # remove defaults
+root.addHandler(stdout_handler)
+root.addHandler(stderr_handler)
+
 
 def gather_all_game_ids(API_KEY: str):
     BASE_URL = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
@@ -56,9 +77,9 @@ def gather_all_game_ids(API_KEY: str):
             all_new_games.extend(games)
             last_appid = games[-1]["appid"]  # steam calls them appid instead of app_id
 
-            print(f"Fetched {len(games)} games, total so far: {len(all_new_games)}")
+            logging.info(f"Fetched {len(games)} games, total so far: {len(all_new_games)}")
         else:
-            print(f"Failed to fetch data. Status code: {response.status_code}")
+            logging.info(f"Failed to fetch data. Status code: {response.status_code}")
             break
 
     current_unique_games = {game["appid"]: game for game in all_new_games}.values()
@@ -76,7 +97,7 @@ def gather_all_game_ids(API_KEY: str):
     
     conn.commit()
 
-    print(f"{len(new_games)} new game ids added to the database.")
+    logging.info(f"{len(new_games)} new game ids added to the database.")
 
 
 
@@ -109,7 +130,7 @@ def store_game_details_in_db(new_ids_only: bool):
         cursor.execute(query)
         rows = cursor.fetchall() 
     except mysql.connector.Error as err:
-        print(f"Failed to fetch app IDs from the database: {err}")
+        logging.error(f"Failed to fetch app IDs from the database: {err}")
         return
 
     app_ids = [row[0] for row in rows]
@@ -121,11 +142,11 @@ def store_game_details_in_db(new_ids_only: bool):
 
     for i, app_id  in enumerate(app_ids, start=1):    
         if not str(app_id).isdigit():
-            print(f"{app_id} appid contains non digits")
+            logging.error(f"{app_id} appid contains non digits")
             continue 
 
         if i % 50 == 0:
-            print(f"Processed {i} games so far...")
+            logging.info(f"Processed {i} games so far...")
 
         if i % batch_size == 0:
             conn.commit()
@@ -134,7 +155,7 @@ def store_game_details_in_db(new_ids_only: bool):
             remaining_time = duration - elapsed_time
 
             if remaining_time > 0:
-                print(f"Pausing for {remaining_time:.2f} seconds...")
+                logging.info(f"Pausing for {remaining_time:.2f} seconds...")
                 time.sleep(remaining_time)
 
             start_time = time.time()  # Reset the timer for the next batch
@@ -145,17 +166,17 @@ def store_game_details_in_db(new_ids_only: bool):
         try:
             response = requests.get(details_url, timeout=10)
         except requests.exceptions.RequestException as e:
-            print(f"Request error for app_id={app_id}: {e}")
+            logging.error(f"Request error for app_id={app_id}: {e}")
             continue
 
         if response.status_code != 200:
-            print(f"Failed to fetch data for app_id={app_id}. HTTP {response.status_code}")
+            logging.error(f"Failed to fetch data for app_id={app_id}. HTTP {response.status_code}")
             continue
 
         try:
             data = response.json()  
         except ValueError:
-            print(f"Invalid JSON response for app_id={app_id}")
+            logging.error(f"Invalid JSON response for app_id={app_id}")
             continue
 
         app_key = str(app_id)
@@ -262,7 +283,7 @@ def store_game_details_in_db(new_ids_only: bool):
         try:
             cursor.execute(upsert_sql, vals)
         except mysql.connector.Error as err:
-            print(f"MySQL error for app_id={app_id}: {err}")
+            logging.error(f"MySQL error for app_id={app_id}: {err}")
             continue
 
         # Delete old categories and genres for simplicity
@@ -282,7 +303,7 @@ def store_game_details_in_db(new_ids_only: bool):
                 """
                 cursor.execute(cat_insert_sql, (app_id, cat_name))
             else:
-                print("No categories found for ", app_id)
+                logging.info("No categories found for ", app_id)
 
         # Insert genres
         genres = details.get("genres", [])
@@ -295,13 +316,13 @@ def store_game_details_in_db(new_ids_only: bool):
                 """
                 cursor.execute(gen_insert_sql, (app_id, gen_name))
             else:
-                print("No genres found for ", app_id)
+                logging.info("No genres found for ", app_id)
 
     if batch_counter > 0:
         conn.commit()
         batch_counter = 0
 
-    print("Finished storing all game details into the database.")
+    logging.info("Finished storing all game details into the database.")
 
 
 async def process_reviews(response, app_id: int):
@@ -313,14 +334,14 @@ async def process_reviews(response, app_id: int):
         if no_reviews_div:
             positive, total, negative = 0, 0, 0
         else:
-            print(f"Missing review elements for app_id {app_id}. Skipping reviews.")
+            logging.error(f"Missing review elements for app_id {app_id}. Skipping reviews.")
             return
     else:
         try:
             positive = int(positive_input.attrs.get("value", "0"))
             total    = int(total_input.attrs.get("value", "0"))
         except ValueError as ve:
-            print(f"Error converting review numbers for app_id {app_id}: {ve}")
+            logging.error(f"Error converting review numbers for app_id {app_id}: {ve}")
             return
         negative = total - positive
 
@@ -331,14 +352,14 @@ async def process_reviews(response, app_id: int):
 async def process_tags(response, app_id: int):
     tags_elements = response.html.find("a.app_tag")
     if not tags_elements:
-        print(f"No tags found for app_id {app_id}. Skipping tags.")
+        logging.error(f"No tags found for app_id {app_id}. Skipping tags.")
         return
     try:
         tags = {el.text for el in tags_elements}
         payload = json.dumps({"tags": list(tags)})
         tag_upserts.append((app_id, payload))
     except Exception as e:
-        print(f"Error extracting tags for app_id {app_id}: {e}")
+        logging.error(f"Error extracting tags for app_id {app_id}: {e}")
 
 
 async def process_app(asession: AsyncHTMLSession, app_id: int, semaphore):
@@ -368,9 +389,17 @@ async def process_app(asession: AsyncHTMLSession, app_id: int, semaphore):
     url = f"https://store.steampowered.com/app/{app_id}"
     try:
         async with semaphore:
-            response = await asession.get(url, headers=headers, cookies=cookies, timeout=10)
+            try:
+                response = await asyncio.wait_for(
+                    asession.get(url, headers=headers, cookies=cookies),
+                    timeout=15 
+                )
+            except asyncio.TimeoutError:
+                logging.error(f"Timeout fetching app {app_id}")
+                return
+
     except Exception as e:
-        print(f"Error fetching URL for app_id {app_id}: {e}")
+        logging.error(f"Error fetching URL for app_id {app_id}: {e}")
         return
 
     # Use the single response to scrape both reviews and tags concurrently.
@@ -397,7 +426,7 @@ def upsert_tags_batch(batch: list[tuple[int,str]]):
         cursor.executemany(sql, batch)
         conn.commit()
     except Exception as e:
-        print(f"Error upserting steam_game_tags batch: {e}")
+        logging.error(f"Error upserting steam_game_tags batch: {e}")
         conn.rollback()
 
 
@@ -419,7 +448,7 @@ def upsert_reviews_batch(batch: list[tuple[int,int,int,int]]):
         cursor.executemany(sql, batch)
         conn.commit()
     except Exception as e:
-        print(f"Error upserting steam_game_reviews batch: {e}")
+        logging.error(f"Error upserting steam_game_reviews batch: {e}")
         conn.rollback()
 
 
@@ -435,9 +464,9 @@ def rebuild_tags_summary():
     try:
         cursor.execute(rebuild_sql)
         conn.commit()
-        print("Rebuilt steam_tag_summary.")
+        logging.info("Rebuilt steam_tag_summary.")
     except Exception as e:
-        print(f"Error rebuilding summary: {e}")
+        logging.error(f"Error rebuilding summary: {e}")
         conn.rollback()
 
 
@@ -458,9 +487,9 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
     try:
         cursor.execute(query)
         all_app_ids = [r[0] for r in cursor.fetchall()]
-        print(f"Found {len(all_app_ids)} app_ids to process.")
+        logging.info(f"Found {len(all_app_ids)} app_ids to process.")
     except Exception as e:
-        print(f"Error fetching app_ids from database: {e}")
+        logging.error(f"Error fetching app_ids from database: {e}")
         return
 
     asession = AsyncHTMLSession()
@@ -470,7 +499,7 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
     # scrape in batches
     for i, app_id in enumerate(all_app_ids, start=1):
         if not str(app_id).isdigit():
-            print(f"{app_id} app_id is not numeric. Skipping.")
+            logging.info(f"{app_id} app_id is not numeric. Skipping.")
             continue
 
         pending.append(process_app(asession, app_id, semaphore))
@@ -480,16 +509,18 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
 
         if i % batch_size == 0:
             # wait for this batch
+            t0 = time.time()
             await asyncio.gather(*pending)
+            logging.debug(f"Gathered batch in {time.time()-t0:.1f}s")
             pending.clear()
 
             # commit any detail updates done inside process_app
             try:
                 conn.commit()
             except Exception as e:
-                print(f"Commit error after batch {i}: {e}")
+                logging.error(f"Commit error after batch {i}: {e}")
                 conn.rollback()
-            print(f"Scraped {i} games")
+            logging.info(f"Scraped {i} games")
 
             # upsert and flush all tags and reviews for this batch
             upsert_tags_batch(tag_upserts)
@@ -503,7 +534,7 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
         try:
             conn.commit()
         except Exception as e:
-            print(f"Final commit error: {e}")
+            logging.error(f"Final commit error: {e}")
             conn.rollback()
 
     # upsert and flush any remaining tags and reviews for this batch
@@ -514,7 +545,7 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
 
     rebuild_tags_summary()
 
-    print("All app_ids processed and committed.")
+    logging.info("All app_ids processed and committed.")
 
 
  
@@ -529,7 +560,7 @@ def main():
         with open('./environment.txt', "r") as file:
             API_KEY = file.read().strip()
     except FileNotFoundError:
-        print("Environment file not found at 'environment.txt'.")
+        logging.error("Environment file not found at 'environment.txt'.")
 
     if args.type == "all-ids":
         gather_all_game_ids(API_KEY)
@@ -542,7 +573,7 @@ def main():
     elif args.type == "gather-new-games-reviews-and-tags":
         asyncio.run(store_game_reviews_and_tags_in_db(True))
     else:
-        print("Please use --type all-ids or --type gather-new-games-info or --type gather-all-games-info or --type gather-all-games-tags or --type gather-new-games-tags or  --type gather-all-games-reviews-and-tags or --type gather-new-games-reviews-and-tags")
+        logging.info("Please use --type all-ids or --type gather-new-games-info or --type gather-all-games-info or --type gather-all-games-tags or --type gather-new-games-tags or  --type gather-all-games-reviews-and-tags or --type gather-new-games-reviews-and-tags")
 
     cursor.close()
     conn.close()
