@@ -18,6 +18,12 @@ conn = mysql.connector.connect(
 cursor = conn.cursor()
 
 
+# holds (app_id, tags_json_str) for current batch
+tag_upserts: list[tuple[int, str]] = []
+
+# holds all reviews for batch upserts
+review_upserts: list[tuple[int,int,int,int]] = []
+
 def gather_all_game_ids(API_KEY: str):
     BASE_URL = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
     
@@ -33,6 +39,7 @@ def gather_all_game_ids(API_KEY: str):
 
     all_new_games = []
     last_appid = 0
+    
 
     while True:
         params["last_appid"] = last_appid
@@ -297,67 +304,44 @@ def store_game_details_in_db(new_ids_only: bool):
     print("Finished storing all game details into the database.")
 
 
-async def process_reviews(response, app_id: str):
+async def process_reviews(response, app_id: int):
     positive_input = response.html.find("input#review_summary_num_positive_reviews", first=True)
-    total_input = response.html.find("input#review_summary_num_reviews", first=True)
+    total_input    = response.html.find("input#review_summary_num_reviews", first=True)
 
     if positive_input is None or total_input is None:
         no_reviews_div = response.html.find("div.noReviewsYetTitle", first=True)
         if no_reviews_div:
             positive, total, negative = 0, 0, 0
         else:
-            print(f"Missing review elements for app_id {app_id} and no 'noReviewsYetTitle' div found. Skipping reviews.")
+            print(f"Missing review elements for app_id {app_id}. Skipping reviews.")
             return
     else:
         try:
             positive = int(positive_input.attrs.get("value", "0"))
-            total = int(total_input.attrs.get("value", "0"))
+            total    = int(total_input.attrs.get("value", "0"))
         except ValueError as ve:
             print(f"Error converting review numbers for app_id {app_id}: {ve}")
             return
         negative = total - positive
 
-    try:
-        sql = """
-        INSERT INTO steam_game_reviews (app_id, positive, negative, total)
-        VALUES (%s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            positive = VALUES(positive),
-            negative = VALUES(negative),
-            total = VALUES(total)
-        """
-        values = (app_id, positive, negative, total)
-        cursor.execute(sql, values)
-    except Exception as e:
-        print(f"Database error for app_id {app_id} reviews: {e}")
-        conn.rollback()
+    # stash for later batch upsert
+    review_upserts.append((app_id, positive, negative, total))
 
-async def process_tags(response, app_id: str):
+
+async def process_tags(response, app_id: int):
     tags_elements = response.html.find("a.app_tag")
     if not tags_elements:
         print(f"No tags found for app_id {app_id}. Skipping tags.")
         return
     try:
-        tags = [el.text for el in tags_elements]
+        tags = {el.text for el in tags_elements}
+        payload = json.dumps({"tags": list(tags)})
+        tag_upserts.append((app_id, payload))
     except Exception as e:
         print(f"Error extracting tags for app_id {app_id}: {e}")
-        return
 
-    try:
-        sql = """
-        INSERT INTO steam_game_tags (app_id, tag)
-        VALUES (%s, %s)
-        ON DUPLICATE KEY UPDATE
-            tag = VALUES(tag)
-        """
-        for tag in tags:
-            values = (app_id, tag)
-            cursor.execute(sql, values)
-    except Exception as e:
-        print(f"Database error for app_id {app_id} tags: {e}")
-        conn.rollback()
 
-async def process_app(asession: AsyncHTMLSession, app_id: str, semaphore):
+async def process_app(asession: AsyncHTMLSession, app_id: int, semaphore):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -395,6 +379,68 @@ async def process_app(asession: AsyncHTMLSession, app_id: str, semaphore):
         process_tags(response, app_id)
     )
 
+
+def upsert_tags_batch(batch: list[tuple[int,str]]):
+    """
+    batch is a list of (app_id, tags_json_str)
+    """
+    if not batch:
+        return
+    sql = """
+      INSERT INTO steam_game_tags (app_id, tags_json)
+      VALUES (%s, %s)
+      ON DUPLICATE KEY UPDATE
+        tags_json    = VALUES(tags_json),
+        last_updated = CURRENT_TIMESTAMP
+    """
+    try:
+        cursor.executemany(sql, batch)
+        conn.commit()
+    except Exception as e:
+        print(f"Error upserting steam_game_tags batch: {e}")
+        conn.rollback()
+
+
+def upsert_reviews_batch(batch: list[tuple[int,int,int,int]]):
+    """
+    batch is a list of (app_id, positive, negative, total)
+    """
+    if not batch:
+        return
+    sql = """
+      INSERT INTO steam_game_reviews (app_id, positive, negative, total)
+      VALUES (%s, %s, %s, %s)
+      ON DUPLICATE KEY UPDATE
+        positive = VALUES(positive),
+        negative = VALUES(negative),
+        total    = VALUES(total)
+    """
+    try:
+        cursor.executemany(sql, batch)
+        conn.commit()
+    except Exception as e:
+        print(f"Error upserting steam_game_reviews batch: {e}")
+        conn.rollback()
+
+
+def rebuild_tags_summary():
+    rebuild_sql = """
+      INSERT INTO steam_tag_summary (tag, game_count)
+      SELECT tag, COUNT(DISTINCT app_id)
+        FROM steam_game_tags
+       GROUP BY tag
+      ON DUPLICATE KEY UPDATE
+        game_count = VALUES(game_count)
+    """
+    try:
+        cursor.execute(rebuild_sql)
+        conn.commit()
+        print("Rebuilt steam_tag_summary.")
+    except Exception as e:
+        print(f"Error rebuilding summary: {e}")
+        conn.rollback()
+
+
 async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
     max_concurrency = 10      # Limit concurrent HTTP requests
     batch_size = 200          # Commit to DB every 200 processed games
@@ -411,40 +457,65 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
 
     try:
         cursor.execute(query)
-        all_app_ids = cursor.fetchall()
+        all_app_ids = [r[0] for r in cursor.fetchall()]
         print(f"Found {len(all_app_ids)} app_ids to process.")
     except Exception as e:
         print(f"Error fetching app_ids from database: {e}")
         return
-    
+
     asession = AsyncHTMLSession()
-    tasks = []
-    for i, (app_id,) in enumerate(all_app_ids, start=1):
+    pending = []
+    tags_to_flush = []
+
+    # scrape in batches
+    for i, app_id in enumerate(all_app_ids, start=1):
         if not str(app_id).isdigit():
             print(f"{app_id} app_id is not numeric. Skipping.")
             continue
 
-        tasks.append(process_app(asession, app_id, semaphore))
+        pending.append(process_app(asession, app_id, semaphore))
+
+        # mark for flush after scrape
+        tags_to_flush.append(app_id)
 
         if i % batch_size == 0:
-            await asyncio.gather(*tasks)
-            tasks.clear()
+            # wait for this batch
+            await asyncio.gather(*pending)
+            pending.clear()
+
+            # commit any detail updates done inside process_app
             try:
                 conn.commit()
             except Exception as e:
                 print(f"Commit error after batch {i}: {e}")
                 conn.rollback()
-            print(f"Scraped {i} games so far...")
+            print(f"Scraped {i} games")
 
-    if tasks:
-        await asyncio.gather(*tasks)
+            # upsert and flush all tags and reviews for this batch
+            upsert_tags_batch(tag_upserts)
+            tag_upserts.clear()
+            upsert_reviews_batch(review_upserts)
+            review_upserts.clear()
+
+    # final flush
+    if pending:
+        await asyncio.gather(*pending)
         try:
             conn.commit()
         except Exception as e:
             print(f"Final commit error: {e}")
             conn.rollback()
 
+    # upsert and flush any remaining tags and reviews for this batch
+    upsert_tags_batch(tag_upserts)
+    tag_upserts.clear()
+    upsert_reviews_batch(review_upserts)
+    review_upserts.clear()
+
+    rebuild_tags_summary()
+
     print("All app_ids processed and committed.")
+
 
  
 
