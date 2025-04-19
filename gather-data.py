@@ -32,8 +32,10 @@ stderr_handler = logging.StreamHandler(sys.stderr)
 stderr_handler.setLevel(logging.WARNING)
 
 # 2) Use the same formatter (with level name in it)
-fmt = "%(asctime)s [%(levelname)s] %(message)s"
-formatter = logging.Formatter(fmt)
+formatter = logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%m-%d %H:%M:%S"
+)
 stdout_handler.setFormatter(formatter)
 stderr_handler.setFormatter(formatter)
 
@@ -508,10 +510,10 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
         tags_to_flush.append(app_id)
 
         if i % batch_size == 0:
-            # wait for this batch
             t0 = time.time()
+
+            # wait for this batch
             await asyncio.gather(*pending)
-            logging.debug(f"Gathered batch in {time.time()-t0:.1f}s")
             pending.clear()
 
             # commit any detail updates done inside process_app
@@ -520,7 +522,8 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
             except Exception as e:
                 logging.error(f"Commit error after batch {i}: {e}")
                 conn.rollback()
-            logging.info(f"Scraped {i} games")
+
+            logging.info(f"Gathered batch in {time.time()-t0:.1f}s and scraped {i} games so far")
 
             # upsert and flush all tags and reviews for this batch
             upsert_tags_batch(tag_upserts)
