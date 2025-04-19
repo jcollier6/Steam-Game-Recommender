@@ -91,7 +91,7 @@
                         </label>
                         <!-- exclude button -->
                         <button class="exclude-button"
-                            title="Exclude tag"
+                            [title]="excludedTags.has(tag) ? 'Include tag' : 'Exclude tag'"
                             (click)="toggleExclude(tag)">
                         </button>
                         <div class="tag-count">
