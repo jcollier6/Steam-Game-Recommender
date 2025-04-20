@@ -60,6 +60,10 @@
     flex-direction: column;
     align-items: center;
 }
+.slider {
+    margin: 0 10%;
+    width: 80%;
+}
 .slider-value {
     font-size: var(--font-size-standard);
 }

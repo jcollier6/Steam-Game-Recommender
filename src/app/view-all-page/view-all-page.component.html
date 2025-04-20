@@ -10,7 +10,7 @@
                             <span class="slider-label">Niche</span>
                             <span class="slider-label">Popular</span>
                         </div>
-                        <app-custom-slider [(value)]="reviewCountSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                        <app-custom-slider class="slider" [(value)]="reviewCountSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
                         <span class="slider-value">{{ reviewCountSliderValue }}%</span>
                     </div>
                     
@@ -23,7 +23,7 @@
                             <span class="slider-label">Negative</span>
                             <span class="slider-label">Positive</span>
                         </div>
-                        <app-custom-slider [(value)]="reviewScoreSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                        <app-custom-slider class="slider" [(value)]="reviewScoreSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
                         <span class="slider-value">{{ reviewScoreSliderValue }}%</span>
                     </div>
                 </div>
@@ -35,7 +35,7 @@
             <div class="option-container">
                 <span class="option-title">Filter by Price</span>
                 <div class="slider-holder">
-                    <app-custom-slider [(value)]="priceSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
+                    <app-custom-slider class="slider" [(value)]="priceSliderValue" [min]="0" [max]="100" [step]="5"></app-custom-slider>
                     <span class="slider-value">Value: {{ priceSliderValue }}</span>
                 </div>
                 <div class="divider-line"></div>
