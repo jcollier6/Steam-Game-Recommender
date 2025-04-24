@@ -2,11 +2,14 @@ import argparse
 import json
 import time
 from datetime import datetime
-import requests
+import httpx
+from httpx import AsyncClient, Limits
+from bs4 import BeautifulSoup
 import mysql.connector
-from requests_html import AsyncHTMLSession
 import asyncio
-import logging, sys
+import logging
+import sys
+import re
 
 
 # ---- MySQL CONNECTION ----
@@ -18,6 +21,8 @@ conn = mysql.connector.connect(
 )
 cursor = conn.cursor()
 
+# Regex pattern to match leading/trailing whitespace including non-breaking spaces
+whitespace_pattern = re.compile(r'^[\s\u00A0]+|[\s\u00A0]+$')
 
 # holds (app_id, tags_json_str) for current batch
 tag_upserts: list[tuple[int, str]] = []
@@ -27,9 +32,12 @@ review_upserts: list[tuple[int,int,int,int]] = []
 
 # 1) Create two handlers: one for INFO→stdout, one for WARNING+→stderr
 stdout_handler = logging.StreamHandler(sys.stdout)
-stdout_handler.setLevel(logging.INFO)
 stderr_handler = logging.StreamHandler(sys.stderr)
-stderr_handler.setLevel(logging.WARNING)
+stdout_handler.setLevel(logging.INFO)
+stdout_handler.addFilter(lambda record: record.levelno < logging.ERROR)
+
+stderr_handler.setLevel(logging.ERROR)  # ERROR and above
+
 
 # 2) Use the same formatter (with level name in it)
 formatter = logging.Formatter(
@@ -45,6 +53,7 @@ root.setLevel(logging.DEBUG)        # capture everything
 root.handlers.clear()              # remove defaults
 root.addHandler(stdout_handler)
 root.addHandler(stderr_handler)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def gather_all_game_ids(API_KEY: str):
@@ -66,9 +75,7 @@ def gather_all_game_ids(API_KEY: str):
 
     while True:
         params["last_appid"] = last_appid
-
-        response = requests.get(BASE_URL, params=params)
-
+        response = httpx.get(BASE_URL, params=params, timeout=15)
         if response.status_code == 200:
             data = response.json()
             games = data.get("response", {}).get("apps", [])
@@ -166,8 +173,8 @@ def store_game_details_in_db(new_ids_only: bool):
 
         details_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
         try:
-            response = requests.get(details_url, timeout=10)
-        except requests.exceptions.RequestException as e:
+            response = httpx.get(details_url, timeout=15)
+        except httpx.RequestError as e:
             logging.error(f"Request error for app_id={app_id}: {e}")
             continue
 
@@ -327,12 +334,13 @@ def store_game_details_in_db(new_ids_only: bool):
     logging.info("Finished storing all game details into the database.")
 
 
-async def process_reviews(response, app_id: int):
-    positive_input = response.html.find("input#review_summary_num_positive_reviews", first=True)
-    total_input    = response.html.find("input#review_summary_num_reviews", first=True)
+async def process_reviews(html: str, app_id: int):
+    soup = BeautifulSoup(html, "html.parser")
+    positive_input = soup.select_one("input#review_summary_num_positive_reviews")
+    total_input    = soup.select_one("input#review_summary_num_reviews")
 
     if positive_input is None or total_input is None:
-        no_reviews_div = response.html.find("div.noReviewsYetTitle", first=True)
+        no_reviews_div = soup.select_one("div.noReviewsYetTitle")
         if no_reviews_div:
             positive, total, negative = 0, 0, 0
         else:
@@ -340,8 +348,8 @@ async def process_reviews(response, app_id: int):
             return
     else:
         try:
-            positive = int(positive_input.attrs.get("value", "0"))
-            total    = int(total_input.attrs.get("value", "0"))
+            positive = int(positive_input.get("value", "0"))
+            total    = int(total_input.get("value", "0"))
         except ValueError as ve:
             logging.error(f"Error converting review numbers for app_id {app_id}: {ve}")
             return
@@ -351,20 +359,29 @@ async def process_reviews(response, app_id: int):
     review_upserts.append((app_id, positive, negative, total))
 
 
-async def process_tags(response, app_id: int):
-    tags_elements = response.html.find("a.app_tag")
+async def process_tags(html: str, app_id: int):
+    soup = BeautifulSoup(html, "html.parser")
+    tags_elements = soup.select("a.app_tag")
+
     if not tags_elements:
         logging.error(f"No tags found for app_id {app_id}. Skipping tags.")
         return
+
     try:
-        tags = {el.text for el in tags_elements}
-        payload = json.dumps({"tags": list(tags)})
+        clean_tags = []
+        for el in tags_elements:
+            raw = el.get_text()
+            # Remove all leading/trailing whitespace including non-breaking space (U+00A0)
+            cleaned = whitespace_pattern.sub('', raw)
+            if cleaned:
+                clean_tags.append(cleaned)
+
+        payload = json.dumps({"tags": clean_tags}, separators=(',', ':'))
         tag_upserts.append((app_id, payload))
     except Exception as e:
         logging.error(f"Error extracting tags for app_id {app_id}: {e}")
 
-
-async def process_app(asession: AsyncHTMLSession, app_id: int, semaphore):
+async def process_app(client: AsyncClient, app_id: int, semaphore):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -393,7 +410,7 @@ async def process_app(asession: AsyncHTMLSession, app_id: int, semaphore):
         async with semaphore:
             try:
                 response = await asyncio.wait_for(
-                    asession.get(url, headers=headers, cookies=cookies),
+                    client.get(url, headers=headers, cookies=cookies, timeout=15),
                     timeout=15 
                 )
             except asyncio.TimeoutError:
@@ -405,10 +422,12 @@ async def process_app(asession: AsyncHTMLSession, app_id: int, semaphore):
         return
 
     # Use the single response to scrape both reviews and tags concurrently.
+    html = response.text
     await asyncio.gather(
-        process_reviews(response, app_id),
-        process_tags(response, app_id)
+        process_reviews(html, app_id),
+        process_tags(html, app_id)
     )
+    await response.aclose()
 
 
 def upsert_tags_batch(batch: list[tuple[int,str]]):
@@ -421,7 +440,7 @@ def upsert_tags_batch(batch: list[tuple[int,str]]):
       INSERT INTO steam_game_tags (app_id, tags_json)
       VALUES (%s, %s)
       ON DUPLICATE KEY UPDATE
-        tags_json    = VALUES(tags_json),
+        tags_json = VALUES(tags_json),
         last_updated = CURRENT_TIMESTAMP
     """
     try:
@@ -444,7 +463,7 @@ def upsert_reviews_batch(batch: list[tuple[int,int,int,int]]):
       ON DUPLICATE KEY UPDATE
         positive = VALUES(positive),
         negative = VALUES(negative),
-        total    = VALUES(total)
+        total = VALUES(total)
     """
     try:
         cursor.executemany(sql, batch)
@@ -454,14 +473,18 @@ def upsert_reviews_batch(batch: list[tuple[int,int,int,int]]):
         conn.rollback()
 
 
+def refresh_steam_wide_tables():
+    rebuild_tags_summary()
+    update_bayesian_scores()
+
 def rebuild_tags_summary():
     rebuild_sql = """
-      INSERT INTO steam_tag_summary (tag, game_count)
-      SELECT tag, COUNT(DISTINCT app_id)
-        FROM steam_game_tags
-       GROUP BY tag
-      ON DUPLICATE KEY UPDATE
-        game_count = VALUES(game_count)
+        INSERT INTO steam_tag_summary (tag, game_count)
+        SELECT tag, COUNT(DISTINCT app_id)
+        FROM steam_game_tags,
+        JSON_TABLE(tags_json->'$.tags', '$[*]' COLUMNS(tag VARCHAR(255) PATH '$')) AS tag_table
+        GROUP BY tag
+        ON DUPLICATE KEY UPDATE game_count = VALUES(game_count);
     """
     try:
         cursor.execute(rebuild_sql)
@@ -472,48 +495,97 @@ def rebuild_tags_summary():
         conn.rollback()
 
 
-async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
-    max_concurrency = 10      # Limit concurrent HTTP requests
-    batch_size = 200          # Commit to DB every 200 processed games
+def update_bayesian_scores():
+    try:
+        # 1. Get global average rating (across all reviewed games)
+        cursor.execute("""
+            SELECT SUM(positive) / SUM(total)
+            FROM steam_game_reviews
+            WHERE total > 0
+        """)
+        global_avg = cursor.fetchone()[0] or 0.0
+
+        # 2. Get average number of total reviews
+        cursor.execute("""
+            SELECT AVG(total)
+            FROM steam_game_reviews
+            WHERE total > 0
+        """)
+        m = cursor.fetchone()[0] or 0
+
+        logging.info(f"Global average rating: {global_avg:.6f}, Review count average: {m:.2f}")
+
+        # 3. Run bayesian update
+        update_sql = f"""
+            UPDATE steam_game_reviews
+            SET bayesian_score = 
+                CASE 
+                    WHEN total > 0 THEN
+                        ((total / (total + {m})) * (positive / total)) +
+                        (({m} / (total + {m})) * {global_avg})
+                    ELSE
+                        0.7
+                END
+        """
+        cursor.execute(update_sql)
+        conn.commit()
+        logging.info("Bayesian scores updated.")
+    except Exception as e:
+        logging.error(f"Error updating bayesian scores: {e}")
+        conn.rollback()
+
+
+async def store_game_reviews_and_tags_in_db(new_ids_only: bool, offset: int = None):
+    max_concurrency = 10
+    batch_size = 200
     semaphore = asyncio.Semaphore(max_concurrency)
 
     if new_ids_only:
-        query = """
-            SELECT app_id FROM steam_game_details 
+        base_query = """
+            SELECT app_id FROM steam_game_details
             WHERE app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_reviews)
-            OR app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_tags)
+               OR app_id NOT IN (SELECT DISTINCT app_id FROM steam_game_tags)
         """
     else:
-        query = "SELECT app_id FROM steam_game_details"
+        base_query = "SELECT app_id FROM steam_game_details"
+
+    if offset is not None:
+        query = f"{base_query} LIMIT {batch_size} OFFSET {offset}"
+    else:
+        query = base_query
 
     try:
         cursor.execute(query)
         all_app_ids = [r[0] for r in cursor.fetchall()]
-        logging.info(f"Found {len(all_app_ids)} app_ids to process.")
+        logging.info(f"Fetched {len(all_app_ids)} app_ids"f"{' at offset '+str(offset) if offset is not None else ''}.")
     except Exception as e:
         logging.error(f"Error fetching app_ids from database: {e}")
         return
 
-    asession = AsyncHTMLSession()
+    # create HTTPX client
+    client = AsyncClient(
+        limits=Limits(
+            max_connections=max_concurrency,
+            max_keepalive_connections=max_concurrency
+        )
+    )
     pending = []
-    tags_to_flush = []
 
-    # scrape in batches
     for i, app_id in enumerate(all_app_ids, start=1):
         if not str(app_id).isdigit():
-            logging.info(f"{app_id} app_id is not numeric. Skipping.")
+            logging.error(f"{app_id} app_id is not numeric. Skipping.")
             continue
 
-        pending.append(process_app(asession, app_id, semaphore))
-
-        # mark for flush after scrape
-        tags_to_flush.append(app_id)
+        pending.append(process_app(client, app_id, semaphore))
 
         if i % batch_size == 0:
             t0 = time.time()
+            try:
+                await asyncio.wait_for(asyncio.gather(*pending), timeout=30.0)
+            except asyncio.TimeoutError:
+                logging.error("Gather timed out — skipping batch")
+                pending.clear()
 
-            # wait for this batch
-            await asyncio.gather(*pending)
             pending.clear()
 
             # commit any detail updates done inside process_app
@@ -546,7 +618,10 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
     upsert_reviews_batch(review_upserts)
     review_upserts.clear()
 
-    rebuild_tags_summary()
+    refresh_steam_wide_tables()
+
+    # cleanup HTTPX client
+    await client.aclose()
 
     logging.info("All app_ids processed and committed.")
 
@@ -555,7 +630,27 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool):
 
 def main():
     parser = argparse.ArgumentParser(description="Gather Steam Store data.")
-    parser.add_argument("--type", choices=["all-ids", "gather-all-games-info", "gather-new-games-info", "gather-all-games-tags", "gather-new-games-tags", "gather-all-games-reviews-and-tags", "gather-new-games-reviews-and-tags"], help="Gather and store game data from Steam API")
+    parser.add_argument(
+        "--type",
+        choices=[
+            "all-ids",
+            "gather-all-games-info",
+            "gather-new-games-info",
+            "gather-all-games-tags",
+            "gather-new-games-tags",
+            "gather-all-games-reviews-and-tags",
+            "gather-new-games-reviews-and-tags",
+            "refresh-steam-wide-tables",
+            "gather-batch-games-reviews-and-tags"
+        ],
+        help="Gather and store game data from Steam API"
+    )
+    parser.add_argument(
+        "--offset",
+        type=int,
+        default=None,
+        help="If using gather-batch-games-reviews-and-tags, start at this OFFSET"
+    )
     args = parser.parse_args()
 
     API_KEY = ""
@@ -575,8 +670,17 @@ def main():
         asyncio.run(store_game_reviews_and_tags_in_db(False))
     elif args.type == "gather-new-games-reviews-and-tags":
         asyncio.run(store_game_reviews_and_tags_in_db(True))
+    elif args.type == "gather-batch-games-reviews-and-tags":
+        asyncio.run(store_game_reviews_and_tags_in_db(False, offset=args.offset))
+    elif args.type == "refresh-steam-wide-tables":
+        refresh_steam_wide_tables()
     else:
-        logging.info("Please use --type all-ids or --type gather-new-games-info or --type gather-all-games-info or --type gather-all-games-tags or --type gather-new-games-tags or  --type gather-all-games-reviews-and-tags or --type gather-new-games-reviews-and-tags")
+        logging.info(
+            "Please use --type then one of: all-ids, gather-new-games-info, "
+            "gather-all-games-info, gather-all-games-tags, gather-new-games-tags, "
+            "gather-all-games-reviews-and-tags, gather-new-games-reviews-and-tags, "
+            "refresh-steam-wide-tables"
+        )
 
     cursor.close()
     conn.close()
