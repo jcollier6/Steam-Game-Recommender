@@ -55,7 +55,6 @@ export class RecommendationCarouselComponent {
   set recommendedGames(value: Game_Info[]) {
     this._recommendedGames = value || [];
     this.recommendedGameListExist = this._recommendedGames.length > 0;
-    this.updateCurrentGame();
   }
   
   get recommendedGames(): Game_Info[] {
@@ -64,6 +63,33 @@ export class RecommendationCarouselComponent {
 
   constructor(private renderer: Renderer2) {}
 
+  ngOnChanges(): void {
+    if (this.recommendedGames && this.recommendedGames.length > 0) {
+      this.preloadAllImages(this.recommendedGames);
+      this.recommendedGameListExist = true;
+      this.currentIndex = 0;
+      this.updateCurrentGame();
+    } else {
+      this.recommendedGameListExist = false;
+    }
+  }
+  
+  preloadAllImages(games: any[]): void {
+    for (let game of games) {
+      this.preloadImage(game.header_image);
+      if (game.screenshots) {
+        for (let screenshot of game.screenshots) {
+          this.preloadImage(screenshot);
+        }
+      }
+    }
+  }
+  
+  preloadImage(src: string): void {
+    const img = new Image();
+    img.src = src;
+  }
+  
   handleCardClick(app_id: string) {
     const url = `https://store.steampowered.com/app/${app_id}`;
     window.open(url, '_blank');
