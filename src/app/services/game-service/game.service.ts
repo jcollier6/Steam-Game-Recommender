@@ -43,4 +43,8 @@ export class GameService {
   getSteamTagCounts(): Observable<Record<string,number>> {
     return this.httpClient.get<Record<string,number>>(`${this.apiUrl}/steam_tag_counts`);
   }
+
+  getSteamReleaseYears(): Observable<Record<string,number>> {
+    return this.httpClient.get<Record<string,number>>(`${this.apiUrl}/steam_release_years`);
+  }
 }

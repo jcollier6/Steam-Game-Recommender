@@ -95,6 +95,14 @@ def get_steam_tag_counts():
     except Exception as e:
         return JSONResponse(content={"/steam_tag_counts error": str(e)}, status_code=500)
 
+@app.get("/steam_release_years")
+def get_steam_release_years():
+    try:
+        data = get_steam_release_years()
+        return JSONResponse(content=data)  
+    except Exception as e:
+        return JSONResponse(content={"/steam_tag_counts error": str(e)}, status_code=500)
+
 
 def initialize_global_game_data():
     global df_review_data, game_details_by_app_id, app_id_to_tags, all_unique_tags
@@ -366,4 +374,20 @@ def get_steam_tag_counts() -> dict[str, int]:
         return {row["tag"]: row["game_count"] for row in rows}
     except Exception as err:
         logging.error(f"Failed to fetch tag stats: {err}")
+        return {}
+
+
+def get_steam_release_years() -> dict[int, int]:
+    """
+    Returns a dict mapping each release year to its game_count,
+    e.g. {"2024": 1234, "1998": 567, …}
+    """
+    try:
+        rows = query_db(
+            "SELECT release_year, game_count FROM steam_year_summary ORDER BY release_year DESC",
+            dictionary=True
+        )
+        return {row["release_year"]: row["game_count"] for row in rows}
+    except Exception as err:
+        logging.error(f"Failed to fetch release year stats: {err}")
         return {}

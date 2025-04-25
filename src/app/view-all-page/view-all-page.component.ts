@@ -25,6 +25,9 @@ export class ViewAllPageComponent implements OnInit {
   isRecentlyPlayedPage: boolean = false;
   topTagNames: string[] = [];
   selectedTags: Set<string> = new Set();
+  excludedTags: Set<string> = new Set();
+  selectedReleaseYears: Set<string> = new Set();
+  excludedReleaseYears: Set<string> = new Set();
   filteredTags: string[] = [];
   showMoreOrLess: string = 'Show more';
   tagDisplayLimit: number = 5;
@@ -32,7 +35,7 @@ export class ViewAllPageComponent implements OnInit {
   lastSearchTerm: string = '';
   noSearchableTags: boolean = false;
   steamTagCounts: Record<string,number> = {};
-  excludedTags: Set<string> = new Set<string>();
+  steamReleaseYears: { year: string; count: number }[] = [];
 
   checkBox = new FormGroup({
     isHideF2PChecked: new FormControl(false),
@@ -81,86 +84,91 @@ export class ViewAllPageComponent implements OnInit {
     this.gameService.getSteamTagCounts().subscribe(counts => {
       this.steamTagCounts = counts;
     });
+    this.gameService.getSteamReleaseYears().subscribe(data => {
+      this.steamReleaseYears = Object.entries(data)
+        .map(([key, value]) => ({ year: key, count: value }))
+        .sort((a, b) => Number(b.year) - Number(a.year));
+    });
   }
 
   filterTags(searchTerm: string): void {
-  this.lastSearchTerm = searchTerm;
-  const limit = this.tagDisplayLimit;
-  const searchLower = searchTerm.toLowerCase();
+    this.lastSearchTerm = searchTerm;
+    const limit = this.tagDisplayLimit;
+    const searchLower = searchTerm.toLowerCase();
 
-  // 1) Pool = allTags matching the search, or allTags if empty
-  const pool = searchTerm
-    ? this.allTags.filter(t => t.toLowerCase().includes(searchLower))
-    : this.allTags;
+    // 1) Pool = allTags matching the search, or allTags if empty
+    const pool = searchTerm
+      ? this.allTags.filter(t => t.toLowerCase().includes(searchLower))
+      : this.allTags;
 
-  const result: string[] = [];
-  const seen = new Set<string>();
+    const result: string[] = [];
+    const seen = new Set<string>();
 
-  // 2) Checked tags first—but only those matching the search
-  for (const tag of this.selectedTags) {
-    if (result.length >= limit) break;
-    if (searchTerm && !tag.toLowerCase().includes(searchLower)) {
-      continue;
-    }
-    if (!seen.has(tag)) {
-      result.push(tag);
-      seen.add(tag);
-    }
-  }
-
-  // 3) Then excludedTags but only those matching the search
-  for (const tag of this.excludedTags) {
-    if (result.length >= limit) break;
-    if (searchTerm && !tag.toLowerCase().includes(searchLower)) {
-      continue;
-    }
-    if (!seen.has(tag)) {
-      result.push(tag);
-      seen.add(tag);
-    }
-  }
-
-  // 4) Then topTagNames (only if in pool)
-  for (const tag of this.topTagNames) {
-    if (result.length >= limit) break;
-    if (!seen.has(tag) && pool.includes(tag)) {
-      result.push(tag);
-      seen.add(tag);
-    }
-  }
-
-  // 5) Fill the rest up to limit by highest steamTagCounts
-  if (result.length < limit) {
-    const needed = limit - result.length;
-    const topK: string[] = [];
-
-    for (const tag of pool) {
-      if (seen.has(tag)) continue;
-      const cnt = this.steamTagCounts[tag] || 0;
-      let pos = 0;
-      while (pos < topK.length &&
-             (this.steamTagCounts[topK[pos]] || 0) >= cnt) {
-        pos++;
+    // 2) Checked tags first—but only those matching the search
+    for (const tag of this.selectedTags) {
+      if (result.length >= limit) break;
+      if (searchTerm && !tag.toLowerCase().includes(searchLower)) {
+        continue;
       }
-      if (pos < needed) {
-        topK.splice(pos, 0, tag);
-        if (topK.length > needed) topK.length = needed;
+      if (!seen.has(tag)) {
+        result.push(tag);
+        seen.add(tag);
       }
     }
 
-    result.push(...topK);
-  }
+    // 3) Then excludedTags but only those matching the search
+    for (const tag of this.excludedTags) {
+      if (result.length >= limit) break;
+      if (searchTerm && !tag.toLowerCase().includes(searchLower)) {
+        continue;
+      }
+      if (!seen.has(tag)) {
+        result.push(tag);
+        seen.add(tag);
+      }
+    }
 
-  this.filteredTags = result;
-  this.noSearchableTags = result.length === 0;
+    // 4) Then topTagNames (only if in pool)
+    for (const tag of this.topTagNames) {
+      if (result.length >= limit) break;
+      if (!seen.has(tag) && pool.includes(tag)) {
+        result.push(tag);
+        seen.add(tag);
+      }
+    }
 
-  // Update show more button accordingly
-  if (this.noSearchableTags) {
-    this.showMoreOrLess = 'No matching tags';
-  } else {
-    this.showMoreOrLess = this.tagDisplayLimit === 5 ? 'Show more' : 'Show less';
+    // 5) Fill the rest up to limit by highest steamTagCounts
+    if (result.length < limit) {
+      const needed = limit - result.length;
+      const topK: string[] = [];
+
+      for (const tag of pool) {
+        if (seen.has(tag)) continue;
+        const cnt = this.steamTagCounts[tag] || 0;
+        let pos = 0;
+        while (pos < topK.length &&
+              (this.steamTagCounts[topK[pos]] || 0) >= cnt) {
+          pos++;
+        }
+        if (pos < needed) {
+          topK.splice(pos, 0, tag);
+          if (topK.length > needed) topK.length = needed;
+        }
+      }
+
+      result.push(...topK);
+    }
+
+    this.filteredTags = result;
+    this.noSearchableTags = result.length === 0;
+
+    // Update show more button accordingly
+    if (this.noSearchableTags) {
+      this.showMoreOrLess = 'No matching tags';
+    } else {
+      this.showMoreOrLess = this.tagDisplayLimit === 5 ? 'Show more' : 'Show less';
+    }
   }
-}
 
 
   clearTagSearch(inputElement: HTMLInputElement): void {
@@ -168,7 +176,7 @@ export class ViewAllPageComponent implements OnInit {
     this.filterTags('');
   }
 
-  onCheckboxChange(tag: string, event: Event) {
+  onTagCheckboxChange(tag: string, event: Event) {
     const input = event.target as HTMLInputElement;
     const checked = input?.checked ?? false;
 
@@ -180,6 +188,20 @@ export class ViewAllPageComponent implements OnInit {
     }
 
     localStorage.setItem('selectedTags', JSON.stringify([...this.selectedTags]));
+  }
+
+  onReleaseYearCheckboxChange(year: string, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const checked = input?.checked ?? false;
+
+    if (checked) {
+      this.selectedReleaseYears.add(year);
+      this.selectedReleaseYears.delete(year);
+    } else {
+      this.selectedReleaseYears.delete(year);
+    }
+
+    localStorage.setItem('selectedReleaseYears', JSON.stringify([...this.selectedReleaseYears]));
   }
 
   toggleTagDisplayLimit(): void {

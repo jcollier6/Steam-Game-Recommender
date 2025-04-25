@@ -77,12 +77,12 @@
 
                 <!-- Display filtered tags -->
                 @for (tag of filteredTags; track tag) {
-                    <div class="filtered-tags">
+                    <div class="filtered-list">
                         <label class="custom-checkbox">
                             <input
                                 type="checkbox"
                                 [checked]="selectedTags.has(tag)"
-                                (change)="onCheckboxChange(tag, $event)" />
+                                (change)="onTagCheckboxChange(tag, $event)" />
                             <span class="checkmark"></span>
                             <span [class.crossed-out]="excludedTags.has(tag)">{{ tag }}</span>
                             @if(topTagNames.includes(tag)) {
@@ -94,7 +94,7 @@
                             [title]="excludedTags.has(tag) ? 'Include tag' : 'Exclude tag'"
                             (click)="toggleExclude(tag)">
                         </button>
-                        <div class="tag-count">
+                        <div class="count-bubble">
                             {{ excludedTags.has(tag) ? 'Excluded' : getTagCount(tag) }}
                         </div>
                     </div>
@@ -105,11 +105,25 @@
             <!-- Filter by Release Year -->
             <div class="option-container">
                 <span class="option-title">Filter by Release Year</span>
-                <label class="custom-checkbox">
-                    <input type="checkbox" formControlName="isIndieOnlyChecked" />
-                    <span class="checkmark"></span>
-                    Placeholder
-                </label>
+                @for (release of steamReleaseYears; track release.year){
+                    <div class="filtered-list">
+                        <label class="custom-checkbox">
+                            <input type="checkbox" 
+                            [checked]="selectedReleaseYears.has(release.year)"
+                            (change)="onReleaseYearCheckboxChange(release.year, $event)" />
+                            <span class="checkmark"></span>
+                            <span [class.crossed-out]="excludedReleaseYears.has(release.year)">{{ release.year }}</span>
+                        </label>
+                        <!-- exclude button -->
+                        <button class="exclude-button"
+                            [title]="excludedReleaseYears.has(release.year) ? 'Include Release Year' : 'Exclude Release Year'"
+                            (click)="toggleExclude(release.year)">
+                        </button>
+                        <div class="count-bubble">
+                            {{ excludedReleaseYears.has(release.year) ? 'Excluded' : release.count }}
+                        </div>
+                    </div>
+                }
             </div>
             <!-- Filter by Platform -->
             <div class="option-container">
