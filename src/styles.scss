@@ -36,7 +36,6 @@ router-outlet + * {
     --font-size-large: 1rem;
     --font-size-xlarge: 1.5rem;
     --font-size-title: clamp(1.3rem, 4vw, 2.5rem);
-    --font-size-h1: clamp(var(--font-size-standard), 1.25vw, var(--font-size-xlarge));
 
     --primary-color: #0E1724;
     --secondary-color: #202732;

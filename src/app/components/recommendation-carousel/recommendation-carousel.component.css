@@ -2,8 +2,9 @@
 .content {
     margin-top: 1rem !important;
 }
+
+/* Screen size below 720p */
 @media (max-width: 1280px) {
-    
     .game-info-holder .screenshots-holder {
         display: none !important;
     }
@@ -32,18 +33,34 @@
         font-size: var(--font-size-standard) !important;
     }
 }
-
 /* Screen size up to 720p */
 @media (min-width: 1280px) {
     .content {
         height: 27rem;
     }
+    .view-all-button {
+        font-size: var(--font-size-large) !important;
+    }
+    .recommended-title-holder {
+        font-size: var(--font-size-large) !important;
+    }
+    .game-title {
+        font-size: var(--font-size-large) !important;
+    }
 }
-
-/* Desktop above 1080p */
+/* Screen size above 1080p */
 @media (min-width: 1921px) {
     .content {
         height: 32rem;
+    }
+    .view-all-button {
+        font-size: var(--font-size-xlarge) !important;
+    }
+    .recommended-title-holder {
+        font-size: var(--font-size-xlarge) !important;
+    }
+    .game-title {
+        font-size: var(--font-size-xlarge) !important;
     }
 }
 
@@ -55,10 +72,10 @@
     width: 100%;
     height: 10%;
     padding: 0.5vw;
-    font-size: var(--font-size-h1);
+    font-size: var(--font-size-xlarge);
 }
 .view-all-button {
-    font-size: var(--font-size-h1);
+    font-size: var(--font-size-xlarge);
     color: var(--accent-color);
     background-color: transparent;
     font-weight: bold;
@@ -99,7 +116,7 @@
     position: relative;
 }
 .game-title {
-    font-size: var(--font-size-h1);
+    font-size: var(--font-size-xlarge);
     word-break: break-word; 
     text-overflow: ellipsis;
     overflow: hidden;
