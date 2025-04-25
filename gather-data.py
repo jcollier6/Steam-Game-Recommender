@@ -476,6 +476,7 @@ def upsert_reviews_batch(batch: list[tuple[int,int,int,int]]):
 def refresh_steam_wide_tables():
     rebuild_tags_summary()
     update_bayesian_scores()
+    rebuild_year_summary()
 
 def rebuild_tags_summary():
     rebuild_sql = """
@@ -533,6 +534,36 @@ def update_bayesian_scores():
     except Exception as e:
         logging.error(f"Error updating bayesian scores: {e}")
         conn.rollback()
+
+
+def rebuild_year_summary():
+    """
+    Populate steam_year_summary with a row per release year
+    and the count of games released that year, excluding games
+    scheduled more than two years in the future.
+    """
+    rebuild_sql = """
+        INSERT INTO steam_year_summary (release_year, game_count)
+        SELECT
+            YEAR(release_date) AS release_year,
+            COUNT(*)             AS game_count
+        FROM steam_game_details
+        WHERE
+            release_date IS NOT NULL
+            AND YEAR(release_date) BETWEEN 1997 AND (YEAR(CURRENT_DATE()) + 2)
+        GROUP BY release_year
+        ON DUPLICATE KEY UPDATE
+            game_count   = VALUES(game_count),
+            last_updated = CURRENT_TIMESTAMP;
+    """
+    try:
+        cursor.execute(rebuild_sql)
+        conn.commit()
+        logging.info("Rebuilt steam_year_summary.")
+    except Exception as e:
+        logging.error(f"Error rebuilding year summary: {e}")
+        conn.rollback()
+
 
 
 async def store_game_reviews_and_tags_in_db(new_ids_only: bool, offset: int = None):
