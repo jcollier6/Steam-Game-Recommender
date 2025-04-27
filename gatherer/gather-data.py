@@ -10,16 +10,24 @@ import asyncio
 import logging
 import sys
 import re
+import os
 
 
+# --- Validate required environment variables ---
+required_vars = ["MYSQL_HOST", "MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE", "API_KEY"]
+for var in required_vars:
+    if var not in os.environ:
+        raise EnvironmentError(f"Missing required environment variable: {var}")
+    
 # ---- MySQL CONNECTION ----
 conn = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    passwd="testpassword1",
-    database="mydb"
+    host=os.environ["MYSQL_HOST"],
+    user=os.environ["MYSQL_USER"],
+    passwd=os.environ["MYSQL_PASSWORD"],
+    database=os.environ["MYSQL_DATABASE"]
 )
 cursor = conn.cursor()
+
 
 # Regex pattern to match leading/trailing whitespace including non-breaking spaces
 whitespace_pattern = re.compile(r'^[\s\u00A0]+|[\s\u00A0]+$')
@@ -113,7 +121,7 @@ def gather_all_game_ids(API_KEY: str):
 def store_game_details_in_db(new_ids_only: bool):
     """
     Fetches app IDs from the 'all_steam_game_ids' database table, retrieves details for each app_id via the Steam API,
-    and upserts into 'steam_game_details'. Also normalizes categories and genres into 'steam_game_categories' & 'steam_game_genres'.
+    and upserts into 'steam_game_details'.
 
     Parameters:
         new_ids_only (bool): If True, only fetch app_ids that are in 'all_steam_game_ids' but not in 'steam_game_details'.
@@ -631,12 +639,10 @@ def main():
     )
     args = parser.parse_args()
 
-    API_KEY = ""
-    try:
-        with open('./environment.txt', "r") as file:
-            API_KEY = file.read().strip()
-    except FileNotFoundError:
-        logging.error("Environment file not found at 'environment.txt'.")
+    API_KEY = os.getenv("API_KEY", "")
+    if not API_KEY:
+        logging.error("API_KEY environment variable not set.")
+
 
     if args.type == "all-ids":
         gather_all_game_ids(API_KEY)

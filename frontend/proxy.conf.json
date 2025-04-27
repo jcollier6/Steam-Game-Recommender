@@ -1,0 +1,45 @@
+{
+    "/recommended_games": {
+      "target": "http://backend:8000",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    },
+    "/recently_played": {
+      "target": "http://backend:8000",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    },
+    "/all_tags": {
+      "target": "http://backend:8000",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    },
+    "/submit-steam-id": {
+      "target": "http://backend:8000",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    },
+    "/top_tag_games": {
+      "target": "http://backend:8000",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    },
+    "/steam_tag_counts": {
+      "target": "http://backend:8000",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    },
+    "/steam_release_years": {
+      "target": "http://backend:8000",
+      "secure": false,
+      "changeOrigin": true,
+      "logLevel": "debug"
+    }
+  }
+  

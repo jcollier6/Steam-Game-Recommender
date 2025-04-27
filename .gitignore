@@ -29,7 +29,7 @@ yarn-error.log
 .history/*
 
 # Miscellaneous
-/.angular/cache
+/frontend/.angular/cache
 .sass-cache/
 /connect.lock
 /coverage
@@ -41,6 +41,28 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# Node dependencies
+frontend/node_modules/
 
-# Environment
-environment.txt
+# Angular build artifacts
+frontend/dist/
+
+# Docker volumes
+mysql-data/
+
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Docker logs (optional)
+*.log
+
+# OS-specific junk
+.DS_Store
+Thumbs.db
+
+# Docker CLI metadata (optional)
+.docker/

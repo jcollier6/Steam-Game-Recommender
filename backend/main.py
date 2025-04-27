@@ -9,6 +9,15 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import logging
+import os
+
+
+# --- Validate required environment variables ---
+required_vars = ["MYSQL_HOST", "MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE", "API_KEY"]
+for var in required_vars:
+    if var not in os.environ:
+        raise EnvironmentError(f"Missing required environment variable: {var}")
+    
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,17 +43,18 @@ logging.basicConfig(
     datefmt="%m-%d %H:%M:%S"
 )
 
-# --- Database Connection Helpers ---
+
 def get_db_connection():
     """Return a new MySQL connection from the pool."""
     return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        passwd="testpassword1",
-        database="mydb",
+        host=os.environ["MYSQL_HOST"],
+        user=os.environ["MYSQL_USER"],
+        passwd=os.environ["MYSQL_PASSWORD"],
+        database=os.environ["MYSQL_DATABASE"],
         pool_name="mypool",
         pool_size=5
     )
+
 
 def query_db(query, params=None, dictionary=True):
     """Run a query and return all results. Automatically opens and closes a connection."""
@@ -201,12 +211,11 @@ all_unique_tags = set()
 
 # --- Helper Functions ---
 def get_API_key():
-    try:
-        with open('./environment.txt', "r") as file:
-            global API_KEY
-            API_KEY = file.read().strip()
-    except FileNotFoundError:
-        logging.error(f"Environment file not found at {'environment.txt'}.")
+    global API_KEY
+    API_KEY = os.getenv("API_KEY", "")
+    if not API_KEY:
+        logging.error("API_KEY environment variable not set.")
+
 
 
 def is_valid_id(steam_id):
