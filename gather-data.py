@@ -126,11 +126,7 @@ def store_game_details_in_db(new_ids_only: bool):
             SELECT a.app_id
             FROM all_steam_game_ids a
             LEFT JOIN steam_game_details d ON a.app_id = d.app_id
-            LEFT JOIN steam_game_genres g ON a.app_id = g.app_id
-            LEFT JOIN steam_game_categories c ON a.app_id = c.app_id
             WHERE d.app_id IS NULL
-            OR g.app_id IS NULL
-            OR c.app_id IS NULL
             """
         else:
             query = "SELECT app_id FROM all_steam_game_ids"
@@ -202,15 +198,10 @@ def store_game_details_in_db(new_ids_only: bool):
 
         # Extract price
         price_overview = details.get("price_overview", {})
-        price_formatted = price_overview.get("final_formatted", "")
+        price_usd = price_overview.get("final_formatted", "").replace("USD", "").strip()
+        price_final = price_overview.get("final")
+        price_discount_percent = price_overview.get("discount_percent")
 
-        if price_formatted and price_formatted.endswith("USD"):
-            # Remove the trailing "USD" and any trailing whitespace
-            price_usd = price_formatted[:-3].strip()
-        else:
-            price_usd = price_formatted or ""
-
-        # Extract release_date info
         release_date_info = details.get("release_date", {})
         coming_soon = 1 if release_date_info.get("coming_soon", False) else 0
         
@@ -239,54 +230,42 @@ def store_game_details_in_db(new_ids_only: bool):
         rec_data = details.get("recommendations", {})
         recommendations_count = rec_data.get("total", 0)
 
+        short_description = details.get("short_description", "")
+        detailed_description = details.get("detailed_description", "")
+
+        genres = ", ".join([g.get("description", "") for g in details.get("genres", []) if g.get("description")])
+        categories = ", ".join([c.get("description", "") for c in details.get("categories", []) if c.get("description")])
+
+        developers = ", ".join(details.get("developers", []))
+        publishers = ", ".join(details.get("publishers", []))
+
+        platforms_info = details.get("platforms", {})
+        platforms = ",".join([platform for platform in ["windows", "mac", "linux"] if platforms_info.get(platform)])
+
         raw_data_json = json.dumps(details)
 
         upsert_sql = """
         INSERT INTO steam_game_details (
-            app_id,
-            name,
-            coming_soon,
-            release_date,
-            is_free,
-            price_usd,
-            recommendations,
-            raw_json,
-            header_image,
-            screenshot1,
-            screenshot2,
-            screenshot3,
-            screenshot4
+            app_id, name, coming_soon, release_date, is_free, price_usd, price_final, price_discount_percent,
+            short_description, detailed_description, genres, categories, developer, publisher, platforms,
+            recommendations, raw_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
-            name = VALUES(name),
-            coming_soon = VALUES(coming_soon),
-            release_date = VALUES(release_date),
-            is_free = VALUES(is_free),
-            price_usd = VALUES(price_usd),
-            recommendations = VALUES(recommendations),
-            raw_json = VALUES(raw_json),
+            name = VALUES(name), coming_soon = VALUES(coming_soon), release_date = VALUES(release_date),
+            is_free = VALUES(is_free), price_usd = VALUES(price_usd), price_final = VALUES(price_final),
+            price_discount_percent = VALUES(price_discount_percent), short_description = VALUES(short_description),
+            detailed_description = VALUES(detailed_description), genres = VALUES(genres), categories = VALUES(categories),
+            developer = VALUES(developer), publisher = VALUES(publisher), platforms = VALUES(platforms),
+            recommendations = VALUES(recommendations), raw_json = VALUES(raw_json),
             fetched_at = CURRENT_TIMESTAMP,
-            header_image = VALUES(header_image),
-            screenshot1 = VALUES(screenshot1),
-            screenshot2 = VALUES(screenshot2),
-            screenshot3 = VALUES(screenshot3),
-            screenshot4 = VALUES(screenshot4)
+            header_image = VALUES(header_image), screenshot1 = VALUES(screenshot1),
+            screenshot2 = VALUES(screenshot2), screenshot3 = VALUES(screenshot3), screenshot4 = VALUES(screenshot4)
         """
         vals = (
-            app_id,
-            name,
-            coming_soon,
-            release_date,  
-            is_free,
-            price_usd,
-            recommendations_count,
-            raw_data_json,
-            header_image,
-            screenshot1,
-            screenshot2,
-            screenshot3,
-            screenshot4
+            app_id, name, coming_soon, release_date, is_free, price_usd, price_final, price_discount_percent,
+            short_description, detailed_description, genres, categories, developers, publishers, platforms,
+            recommendations_count, raw_data_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
 
         try:
@@ -294,38 +273,6 @@ def store_game_details_in_db(new_ids_only: bool):
         except mysql.connector.Error as err:
             logging.error(f"MySQL error for app_id={app_id}: {err}")
             continue
-
-        # Delete old categories and genres for simplicity
-        delete_cats_sql = "DELETE FROM steam_game_categories WHERE app_id=%s"
-        delete_gens_sql = "DELETE FROM steam_game_genres WHERE app_id=%s"
-        cursor.execute(delete_cats_sql, (app_id,))
-        cursor.execute(delete_gens_sql, (app_id,))
-
-        # Insert categories
-        categories = details.get("categories", [])
-        for cat_obj in categories:
-            cat_name = cat_obj.get("description", "")
-            if cat_name:
-                cat_insert_sql = """
-                INSERT INTO steam_game_categories (app_id, category_name)
-                VALUES (%s, %s)
-                """
-                cursor.execute(cat_insert_sql, (app_id, cat_name))
-            else:
-                logging.info("No categories found for ", app_id)
-
-        # Insert genres
-        genres = details.get("genres", [])
-        for gen_obj in genres:
-            gen_name = gen_obj.get("description", "")
-            if gen_name:
-                gen_insert_sql = """
-                INSERT INTO steam_game_genres (app_id, genre_name)
-                VALUES (%s, %s)
-                """
-                cursor.execute(gen_insert_sql, (app_id, gen_name))
-            else:
-                logging.info("No genres found for ", app_id)
 
     if batch_counter > 0:
         conn.commit()
