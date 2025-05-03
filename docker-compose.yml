@@ -78,6 +78,40 @@ services:
     profiles:
       - dev     # <--- only spin this up for dev
 
+  ml-extract:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    env_file: .env
+    depends_on:
+      - mysql
+    volumes:
+      - ./:/app
+    gpus: all
+    profiles: ["extract"]
+    command: >
+      bash -lc "\
+        python ml/extract_features.py && \
+        python ml/generate_embeddings.py && \
+        python ml/build_dataset.py\
+      "
+
+  ml-train:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    env_file: .env
+    depends_on:
+      - mysql
+    volumes:
+      - ./:/app
+    gpus: all
+    profiles: ["train"]
+    command: >
+      bash -lc "\
+        python ml/train_model.py\
+      "
+      
 networks:
   backend-network:
     driver: bridge

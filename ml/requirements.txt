@@ -1,0 +1,8 @@
+mysql-connector-python
+pandas
+numpy
+scikit-learn
+torch
+transformers
+joblib
+pyarrow        # for parquet
