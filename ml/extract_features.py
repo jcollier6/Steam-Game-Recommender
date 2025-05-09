@@ -22,7 +22,7 @@ def main():
           detailed_description,
           is_free,
           price_final      AS price,
-          discount_percent AS discount,
+          price_discount_percent AS discount,
           genres,
           categories,
           tags

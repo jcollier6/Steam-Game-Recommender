@@ -5,6 +5,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     healthcheck:
@@ -85,15 +87,17 @@ services:
     env_file: .env
     depends_on:
       - mysql
+    networks:
+      - backend-network
     volumes:
       - ./:/app
     gpus: all
     profiles: ["extract"]
     command: >
       bash -lc "\
-        python ml/extract_features.py && \
-        python ml/generate_embeddings.py && \
-        python ml/build_dataset.py\
+        python3 ml/extract_features.py && \
+        python3 ml/generate_embeddings.py && \
+        python3 ml/build_dataset.py\
       "
 
   ml-train:
@@ -103,13 +107,15 @@ services:
     env_file: .env
     depends_on:
       - mysql
+    networks:
+      - backend-network
     volumes:
       - ./:/app
     gpus: all
     profiles: ["train"]
     command: >
       bash -lc "\
-        python ml/train_model.py\
+        python3 ml/train_model.py\
       "
       
 networks:

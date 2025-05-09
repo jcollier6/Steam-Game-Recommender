@@ -5,6 +5,7 @@ WORKDIR /app
 # Install Python and basic tools
 RUN apt-get update && \
     apt-get install -y python3 python3-pip git && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (cache this layer)
