@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
 from scipy import sparse
 import joblib
+import json
 
 def main():
     # — Load raw features and embeddings
@@ -51,6 +52,11 @@ def main():
     joblib.dump(mlb_genres,     "/app/ml/data/genre_binarizer.joblib")
     joblib.dump(mlb_cats,       "/app/ml/data/category_binarizer.joblib")
     joblib.dump(scaler,         "/app/ml/data/num_scaler.joblib")
+
+    # — 5) Persist an app_id → row_index mapping during dataset build
+    app_id_list = df["app_id"].tolist()
+    with open("/app/ml/data/app_id_index.json","w") as f:
+        json.dump(app_id_list, f)
 
     print("✅ feature matrix and transformers ready")
 

@@ -69,3 +69,6 @@ Thumbs.db
 
 # generate_embeddings.py results
 ml/data
+
+# ML models
+/ml/models

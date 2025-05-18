@@ -6,3 +6,6 @@ torch
 transformers
 joblib
 pyarrow        # for parquet
+requests
+scipy
+tqdm

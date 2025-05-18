@@ -118,6 +118,18 @@ services:
         python3 ml/train_model.py\
       "
       
+  recommender:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["python", "ml/recommend_games.py"]
+    environment:
+      - ML_DATA_DIR=/app/ml/data
+      - API_KEY=${API_KEY}
+    volumes:
+      - .:/app
+
+
 networks:
   backend-network:
     driver: bridge
