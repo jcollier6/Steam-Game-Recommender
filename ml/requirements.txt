@@ -9,3 +9,4 @@ pyarrow        # for parquet
 requests
 scipy
 tqdm
+uvicorn[standard]

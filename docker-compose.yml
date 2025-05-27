@@ -49,6 +49,8 @@ services:
     networks:
       - backend-network
     entrypoint: ["tail", "-f", "/dev/null"] # Do nothing until manually run command
+    profiles:
+      - gatherer
 
   frontend:
     build:
@@ -59,6 +61,7 @@ services:
       - "80:80"
     depends_on:
       - backend
+      - recommender
     networks:
       - backend-network
     profiles:
@@ -75,6 +78,7 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+      - recommender
     networks:
       - backend-network
     profiles:
@@ -120,14 +124,27 @@ services:
       
   recommender:
     build:
-      context: .
+      context: ./ml
       dockerfile: Dockerfile
-    entrypoint: ["python", "ml/recommend_games.py"]
+    command: uvicorn recommend_games:app --host 0.0.0.0 --port 8001
+    working_dir: /app/ml
     environment:
       - ML_DATA_DIR=/app/ml/data
       - API_KEY=${API_KEY}
     volumes:
       - .:/app
+    gpus: all
+    ports:
+      - "8001:8001"
+    depends_on:
+      - backend
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/docs"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 
 networks:

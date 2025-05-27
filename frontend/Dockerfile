@@ -1,9 +1,9 @@
 # Stage 1: Build Angular app
-FROM node:20 AS build
+FROM node:18 AS build
 
 WORKDIR /app
 COPY . .
-RUN npm install
+RUN npm install --omit=optional
 RUN npm run build --prod
 
 # Stage 2: Serve with Nginx

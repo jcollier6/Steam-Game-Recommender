@@ -16,6 +16,9 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 RUN mkdir -p /root/.cache/huggingface && \
     python3 -c "from transformers import AutoTokenizer, AutoModel; AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2'); AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')"
 
+# Install fastapi to connect between backend and recommend_games
+RUN pip install fastapi uvicorn scikit-learn torch joblib
+
 # Now copy your actual code (only if needed)
 COPY . .
 
