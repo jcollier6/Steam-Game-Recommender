@@ -10,3 +10,4 @@ requests
 scipy
 tqdm
 uvicorn[standard]
+faiss-cpu

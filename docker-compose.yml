@@ -117,10 +117,8 @@ services:
       - ./:/app
     gpus: all
     profiles: ["train"]
-    command: >
-      bash -lc "\
-        python3 ml/train_model.py\
-      "
+    working_dir: /app
+    command: python -m ml.pipeline.train_pipeline
       
   recommender:
     build:
@@ -129,7 +127,7 @@ services:
     command: uvicorn recommend_games:app --host 0.0.0.0 --port 8001
     working_dir: /app/ml
     environment:
-      - ML_DATA_DIR=/app/ml/data
+      - ML_DATA_DIR=/app/data
       - API_KEY=${API_KEY}
     volumes:
       - .:/app
