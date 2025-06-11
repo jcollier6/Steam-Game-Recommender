@@ -23,45 +23,43 @@ export class SignInComponent {
     return this.idInput.invalid && this.idInput.touched;
   }
 
-  steamId: string = '';
-    loading = false;
-  
-    constructor(
-      private http: HttpClient, 
-      private router: Router,
-      private cdr: ChangeDetectorRef) {}
-    
-    onSubmit() {
-      if (this.steamId.trim()) {
-        localStorage.clear();
+  steam_id: string = '';
+  loading = false;
 
-        console.log('Steam ID submitted:', this.steamId);
+  constructor(
+    private http: HttpClient, 
+    private router: Router,
+    private cdr: ChangeDetectorRef) {}
   
-        const url = 'http://localhost:8000/submit-steam-id'; 
-        const body = { steamId: this.steamId };
-        const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-  
-        this.loading = true;
-  
-        this.http.post(url, body, { headers }).subscribe({
-          next: (response) => {
-            console.log('Response from server:', response);
-            this.router.navigate(['/home-page']);
-          },
-          error: (error) => {
-            console.error('Error submitting Steam ID:', error);
-            alert(`Error: ${error.error.detail}`);
-            this.loading = false;
-            this.steamId = '';
-            this.cdr.detectChanges();
-          },
-          complete: () => {
-            this.loading = false;
-            this.cdr.detectChanges();
-          }
-        });
-      } else {
-        console.error('Steam ID is required.');
-      }
+  onSubmit() {
+    if (this.steam_id.trim()) {
+      localStorage.clear();
+
+      const url = 'http://localhost:8000/submit-steam-id'; 
+      const body = { steam_id: this.steam_id };
+      const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+
+      this.loading = true;
+
+      this.http.post(url, body, { headers }).subscribe({
+        next: (response: any) => {
+          const verifiedSteamId = response.steam_id;
+          this.router.navigate(['/home-page'], { state: { steam_id: verifiedSteamId } });
+        },
+        error: (error) => {
+          console.error('Error submitting Steam ID:', error);
+          alert(`Error: ${error.error.detail}`);
+          this.loading = false;
+          this.steam_id = '';
+          this.cdr.detectChanges();
+        },
+        complete: () => {
+          this.loading = false;
+          this.cdr.detectChanges();
+        }
+      });
+    } else {
+      console.error('Steam ID is required.');
     }
+  }
 }

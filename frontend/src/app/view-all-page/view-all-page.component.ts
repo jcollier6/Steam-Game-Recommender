@@ -64,6 +64,7 @@ export class ViewAllPageComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    const steam_id: string = history.state.steam_id;
     this.filteredTags = this.topTagNames.slice(0, 5);
 
     this.route.queryParamMap.subscribe(params => {
@@ -78,7 +79,7 @@ export class ViewAllPageComponent implements OnInit {
     this.gameService.getAllTags().subscribe((data) => {
       this.allTags = data;
     });
-    this.gameService.getRecommendedGames().subscribe((data) => {
+    this.gameService.getRecommendedGames(steam_id).subscribe((data) => {
       this.allRecommendedGames = data;
     });
     this.gameService.getSteamTagCounts().subscribe(counts => {

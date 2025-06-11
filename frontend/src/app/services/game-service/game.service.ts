@@ -22,8 +22,10 @@ export class GameService {
     return this.httpClient.get<string[]>(`/all_tags`);
   }
 
-  getRecommendedGames(): Observable<Game_Info[]> {
-    return this.httpClient.get<Game_Info[]>(`/recommended_games`);
+  getRecommendedGames(steam_id: string, top_k: number = 10): Observable<Game_Info[]> {
+    return this.httpClient.get<Game_Info[]>(
+      `/recommended_games?steam_id=${steam_id}&top_k=${top_k}`
+    );
   }
 
   getAllRecommendedGames(): Observable<Game_Info[]> {
