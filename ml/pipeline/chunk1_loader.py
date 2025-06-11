@@ -7,20 +7,43 @@ from .utils import save_json
 
 
 def load_tags_table(connection) -> Dict[str, int]:
-    df_tags = pd.read_sql('SELECT tag_id FROM tags', connection)
+    df_tags = pd.read_sql('SELECT tag_id FROM steam_game_tags', connection)
     tag_ids = df_tags['tag_id'].unique().tolist()
     tag_id_map = {tag_id: idx for idx, tag_id in enumerate(tag_ids)}
     os.makedirs('data', exist_ok=True)
-    save_json(tag_id_map, 'data/tag_id_map.json')
+    save_json(tag_id_map, 'ml/data/tag_id_map.json')
     return tag_id_map
 
 
 def load_games_table(connection) -> pd.DataFrame:
     query = """
-        SELECT app_id, positive_review_count, negative_review_count,
-               price_usd, discount_usd, release_date,
-               tags, short_description, long_description
-        FROM games
+        SELECT 
+            g.app_id,
+            r.positive AS positive_review_count,
+            r.negative AS negative_review_count,
+            r.total,
+            r.bayesian_score,
+
+            CASE
+                WHEN g.is_free = 1 THEN 0
+                ELSE JSON_UNQUOTE(JSON_EXTRACT(g.price_overview, '$.final')) / 100.0
+            END AS price_usd,
+
+            CASE
+                WHEN g.is_free = 1 THEN 0
+                ELSE (JSON_UNQUOTE(JSON_EXTRACT(g.price_overview, '$.initial')) - JSON_UNQUOTE(JSON_EXTRACT(g.price_overview, '$.final'))) / 100.0
+            END AS discount_usd,
+
+            g.release_date,
+            g.short_description,
+            g.detailed_description AS long_description,
+
+            GROUP_CONCAT(CONCAT(gt.tag, ':', gt.tag_rank) ORDER BY gt.tag_rank SEPARATOR ',') AS tags_with_ranks
+
+        FROM steam_game_details g
+        LEFT JOIN steam_game_reviews r ON g.app_id = r.app_id
+        LEFT JOIN steam_game_tags gt ON g.app_id = gt.app_id
+        GROUP BY g.app_id
     """
     df = pd.read_sql(query, connection)
     return df

@@ -204,11 +204,8 @@ def store_game_details_in_db(new_ids_only: bool):
         name = details.get("name", "")
         is_free = 1 if details.get("is_free", False) else 0
 
-        # Extract price
+        # Extract price overview
         price_overview = details.get("price_overview", {})
-        price_usd = price_overview.get("final_formatted", "").replace("USD", "").strip()
-        price_final = price_overview.get("final")
-        price_discount_percent = price_overview.get("discount_percent")
 
         release_date_info = details.get("release_date", {})
         coming_soon = 1 if release_date_info.get("coming_soon", False) else 0
@@ -254,15 +251,14 @@ def store_game_details_in_db(new_ids_only: bool):
 
         upsert_sql = """
         INSERT INTO steam_game_details (
-            app_id, name, coming_soon, release_date, is_free, price_usd, price_final, price_discount_percent,
+            app_id, name, coming_soon, release_date, price_overview, is_free, 
             short_description, detailed_description, genres, categories, developer, publisher, platforms,
             recommendations, raw_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             name = VALUES(name), coming_soon = VALUES(coming_soon), release_date = VALUES(release_date),
-            is_free = VALUES(is_free), price_usd = VALUES(price_usd), price_final = VALUES(price_final),
-            price_discount_percent = VALUES(price_discount_percent), short_description = VALUES(short_description),
+            price_overview = VALUES(price_overview), is_free = VALUES(is_free), short_description = VALUES(short_description),
             detailed_description = VALUES(detailed_description), genres = VALUES(genres), categories = VALUES(categories),
             developer = VALUES(developer), publisher = VALUES(publisher), platforms = VALUES(platforms),
             recommendations = VALUES(recommendations), raw_json = VALUES(raw_json),
@@ -271,7 +267,7 @@ def store_game_details_in_db(new_ids_only: bool):
             screenshot2 = VALUES(screenshot2), screenshot3 = VALUES(screenshot3), screenshot4 = VALUES(screenshot4)
         """
         vals = (
-            app_id, name, coming_soon, release_date, is_free, price_usd, price_final, price_discount_percent,
+            app_id, name, coming_soon, release_date, price_overview, is_free,
             short_description, detailed_description, genres, categories, developers, publishers, platforms,
             recommendations_count, raw_data_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
@@ -323,18 +319,25 @@ async def process_tags(html: str, app_id: int):
         return
 
     try:
-        clean_tags = []
-        for el in tags_elements:
+        ranked_tags = []
+        for rank, el in enumerate(tags_elements, start=1):
             raw = el.get_text()
-            # Remove all leading/trailing whitespace including non-breaking space (U+00A0)
             cleaned = whitespace_pattern.sub('', raw)
-            if cleaned:
-                clean_tags.append(cleaned)
+            tag_id = el.get("data-tagid")
 
-        payload = json.dumps({"tags": clean_tags}, separators=(',', ':'))
+            if cleaned:
+                ranked_tags.append({
+                    "tag": cleaned,
+                    "rank": rank,
+                    "tag_id": int(tag_id) if tag_id and tag_id.isdigit() else None
+                })
+
+        payload = json.dumps({"tags": ranked_tags}, separators=(',', ':'))
         tag_upserts.append((app_id, payload))
     except Exception as e:
         logging.error(f"Error extracting tags for app_id {app_id}: {e}")
+
+
 
 async def process_app(client: AsyncClient, app_id: int, semaphore):
     headers = {
@@ -385,18 +388,18 @@ async def process_app(client: AsyncClient, app_id: int, semaphore):
     await response.aclose()
 
 
-def upsert_tags_batch(batch: list[tuple[int,str]]):
+def upsert_tags_batch(batch: list[tuple[int, str, int, int | None]]):
     """
-    batch is a list of (app_id, tags_json_str)
+    batch is a list of (app_id, tag, rank, tag_id)
     """
     if not batch:
         return
     sql = """
-      INSERT INTO steam_game_tags (app_id, tags_json)
-      VALUES (%s, %s)
-      ON DUPLICATE KEY UPDATE
-        tags_json = VALUES(tags_json),
-        last_updated = CURRENT_TIMESTAMP
+        INSERT INTO steam_game_tags (app_id, tag, rank, tag_id)
+        VALUES (%s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            rank = VALUES(rank),
+            tag_id = VALUES(tag_id)
     """
     try:
         cursor.executemany(sql, batch)

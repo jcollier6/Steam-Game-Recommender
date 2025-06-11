@@ -127,8 +127,9 @@ def initialize_global_game_data():
 
     # Load details
     rows = query_db("""
-        SELECT app_id, name, is_free, price_usd, header_image,
-               screenshot1, screenshot2, screenshot3, screenshot4
+        SELECT app_id, name, is_free, 
+        JSON_UNQUOTE(JSON_EXTRACT(price_overview, '$.final_formatted')) AS price_usd,
+        header_image, screenshot1, screenshot2, screenshot3, screenshot4
         FROM steam_game_details
     """)
     game_details = {}
@@ -148,19 +149,24 @@ def initialize_global_game_data():
         }
     game_details_by_app_id = game_details
 
-    # Load tags
-    tags_raw = query_db("SELECT app_id, tags FROM steam_game_details;")
+    # Load tags from normalized table
+    tags_raw = query_db("SELECT app_id, tag FROM steam_game_tags;")
+
     tag_dict = {}
+    all_unique_tags = set()
+
     for row in tags_raw:
-        try:
-            app_id = str(row["app_id"])
-            tags_json = json.loads(row["tags"])
-            tag_set = set(tags_json.get("tags", []))
-            tag_dict[app_id] = tag_set
-            all_unique_tags.update(tag_set)
-        except (TypeError, json.JSONDecodeError):
+        app_id = str(row["app_id"])
+        tag = row["tag"]
+
+        if app_id not in tag_dict:
             tag_dict[app_id] = set()
+
+        tag_dict[app_id].add(tag)
+        all_unique_tags.add(tag)
+
     app_id_to_tags = tag_dict
+
 
     get_API_key() 
 
