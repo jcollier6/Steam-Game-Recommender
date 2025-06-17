@@ -44,14 +44,11 @@ def recommend(
             'wishlisted',
             'wishlist_priority',
             'date_added_to_wishlist',
-            'last_played',
         ]
         for col in required_cols:
             if col not in lib.columns:
                 if col == 'wishlisted':
                     lib[col] = False
-                elif col == 'last_played':
-                    lib[col] = pd.Timestamp.utcfromtimestamp(0)
                 else:
                     lib[col] = 0
         pos_mask = (

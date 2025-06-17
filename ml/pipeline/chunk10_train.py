@@ -27,7 +27,7 @@ def _split_by_user(df: pd.DataFrame) -> Dict[int, Dict[str, pd.DataFrame]]:
         positives = grp[(grp["playtime_forever"] > 0) | (grp["playtime_2weeks"] > 0) | (grp["wishlisted"])]
         if len(positives) < 20:
             continue
-        grp = grp.sort_values("last_played")
+        grp = grp.sample(frac=1, random_state=42)
         n = len(grp)
         idx_train_end = max(int(0.8 * n), 1)
         idx_val_end = max(int(0.9 * n), idx_train_end + 1)

@@ -37,13 +37,13 @@ def compute_user_meta_raw(user_id: int, interactions_df: pd.DataFrame, data_dir:
         user_tag_profile = global_tag_mean.copy()
 
     recent_cut = now - timedelta(days=30)
-    recent = interactions_df[(interactions_df['user_id']==user_id) & (interactions_df['last_played']>=recent_cut)]
-    recency = 0.0
-    for _, r in recent.iterrows():
-        d = (now - r['last_played']).days
-        play = 1 if (r['playtime_forever']>0 or r['playtime_2weeks']>0) else 0
-        wish = 1 if r['wishlisted'] else 0
-        recency += math.exp(-ALPHA*d)*(play + wish)
+    recent_play = interactions_df[
+        (interactions_df['user_id']==user_id) & (interactions_df['playtime_2weeks']>0)
+    ]
+    recent_wish = interactions_df[
+        (interactions_df['user_id']==user_id) & (interactions_df['date_added_to_wishlist']>=recent_cut)
+    ]
+    recency = float(len(recent_play) + len(recent_wish))
 
     user_meta_raw = np.concatenate([user_tag_profile, [recency]], axis=0)
     return user_tag_profile, recency, user_meta_raw
