@@ -51,6 +51,10 @@ services:
     entrypoint: ["tail", "-f", "/dev/null"] # Do nothing until manually run command
     profiles:
       - gatherer
+    develop:
+      watch:
+        - action: rebuild
+          path: gatherer/gather-data.py
 
   frontend:
     build:

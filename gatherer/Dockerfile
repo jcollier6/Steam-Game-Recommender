@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Copy gatherer code
 COPY gather-data.py .
+COPY training_steamids.txt .
 
 # Install dependencies
 COPY requirements.txt .

@@ -3,7 +3,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from ml.pipeline.chunk11_inference import recommend
+from pipeline.chunk11_inference import recommend
 
 DATA_DIR = os.getenv("ML_DATA_DIR", "data")
 

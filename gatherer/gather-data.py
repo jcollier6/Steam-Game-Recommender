@@ -1,7 +1,7 @@
 import argparse
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 import httpx
 from httpx import AsyncClient, Limits
 from bs4 import BeautifulSoup
@@ -615,6 +615,95 @@ async def store_game_reviews_and_tags_in_db(new_ids_only: bool, offset: int = No
     logging.info("All app_ids processed and committed.")
 
 
+def gather_training_interactions():
+    """Populate the user_interactions table using steamids listed in
+    the training_steamids file."""
+    file_path = os.path.join(os.path.dirname(__file__), "training_steamids.txt")
+    try:
+        with open(file_path, "r") as f:
+            steam_ids = [line.strip() for line in f if line.strip()]
+    except Exception as e:
+        logging.error(f"Failed to read {file_path}: {e}")
+        return
+
+    # Skip any user_ids that already have interaction records
+    cursor.execute("SELECT DISTINCT user_id FROM user_interactions")
+    existing_ids = {str(row[0]) for row in cursor.fetchall()}
+    steam_ids = [sid for sid in steam_ids if sid not in existing_ids]
+    if not steam_ids:
+        logging.info("All steamids already present in user_interactions table")
+        return
+
+    api_key = os.getenv("API_KEY", "")
+    if not api_key:
+        logging.error("API_KEY environment variable not set.")
+        return
+
+    insert_sql = """
+        INSERT INTO user_interactions (
+            user_id, app_id, playtime_forever, playtime_2weeks,
+            wishlisted, wishlist_priority, date_added_to_wishlist
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            playtime_forever = VALUES(playtime_forever),
+            playtime_2weeks = VALUES(playtime_2weeks),
+            wishlisted = VALUES(wishlisted),
+            wishlist_priority = VALUES(wishlist_priority),
+            date_added_to_wishlist = VALUES(date_added_to_wishlist)
+    """
+
+    for idx, sid in enumerate(steam_ids, start=1):
+        owned_url = (
+            f"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
+            f"?key={api_key}&steamid={sid}"
+        )
+        try:
+            owned_data = httpx.get(owned_url, timeout=15).json()
+            games = owned_data.get("response", {}).get("games", [])
+        except Exception as e:
+            logging.error(f"Error fetching owned games for {sid}: {e}")
+            games = []
+
+        for g in games:
+            app_id = g.get("appid")
+            if app_id is None:
+                continue
+            playtime_forever = g.get("playtime_forever", 0)
+            playtime_2weeks = g.get("playtime_2weeks", 0)
+            cursor.execute(
+                insert_sql,
+                (sid, app_id, playtime_forever, playtime_2weeks, False, 0, None),
+            )
+
+        wish_url = (
+            f"https://api.steampowered.com/IWishlistService/GetWishlist/v1/"
+            f"?key={api_key}&steamid={sid}"
+        )
+        try:
+            wish_data = httpx.get(wish_url, timeout=15).json()
+            items = wish_data.get("response", {}).get("items", [])
+        except Exception as e:
+            logging.error(f"Error fetching wishlist for {sid}: {e}")
+            items = []
+
+        for it in items:
+            app_id = it.get("appid")
+            if app_id is None:
+                continue
+            priority = it.get("priority", 0)
+            added_ts = it.get("added") or it.get("date_added") or 0
+            added = datetime.fromtimestamp(added_ts, tz=timezone.utc) if added_ts else None
+            cursor.execute(
+                insert_sql,
+                (sid, app_id, 0, 0, True, priority, added),
+            )
+
+        if idx % 20 == 0:
+            conn.commit()
+            logging.info(f"Processed {idx} steamids")
+
+    conn.commit()
+    logging.info("Finished gathering training interactions.")
  
 
 def main():
@@ -630,7 +719,8 @@ def main():
             "gather-all-games-reviews-and-tags",
             "gather-new-games-reviews-and-tags",
             "refresh-steam-wide-tables",
-            "gather-batch-games-reviews-and-tags"
+            "gather-batch-games-reviews-and-tags",
+            "gather-training-interactions"
         ],
         help="Gather and store game data from Steam API"
     )
@@ -661,6 +751,8 @@ def main():
         asyncio.run(store_game_reviews_and_tags_in_db(False, offset=args.offset))
     elif args.type == "refresh-steam-wide-tables":
         refresh_steam_wide_tables()
+    elif args.type == "gather-training-interactions":
+        gather_training_interactions()
     else:
         logging.info(
             "Please use --type then one of: all-ids, gather-new-games-info, "

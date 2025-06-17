@@ -6,7 +6,7 @@ from .utils import load_json, save_numpy, save_torch
 
 
 def run_tag_pca(games_df: pd.DataFrame) -> None:
-    tag_id_map = load_json('data/tag_id_map.json')
+    tag_id_map = load_json('ml/data/tag_id_map.json')
     V = len(tag_id_map)
     app_ids = []
     T_raw_all = np.zeros((len(games_df), V), dtype=float)
