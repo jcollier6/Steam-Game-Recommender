@@ -32,8 +32,8 @@ cursor = conn.cursor()
 # Regex pattern to match leading/trailing whitespace including non-breaking spaces
 whitespace_pattern = re.compile(r'^[\s\u00A0]+|[\s\u00A0]+$')
 
-# holds (app_id, tags_json_str) for current batch
-tag_upserts: list[tuple[int, str]] = []
+# holds (app_id, tag, tag_rank) tuples for current batch
+tag_upserts: list[tuple[int, str, int]] = []
 
 # holds all reviews for batch upserts
 review_upserts: list[tuple[int,int,int,int]] = []
@@ -319,21 +319,11 @@ async def process_tags(html: str, app_id: int):
         return
 
     try:
-        ranked_tags = []
         for rank, el in enumerate(tags_elements, start=1):
             raw = el.get_text()
             cleaned = whitespace_pattern.sub('', raw)
-            tag_id = el.get("data-tagid")
-
             if cleaned:
-                ranked_tags.append({
-                    "tag": cleaned,
-                    "rank": rank,
-                    "tag_id": int(tag_id) if tag_id and tag_id.isdigit() else None
-                })
-
-        payload = json.dumps({"tags": ranked_tags}, separators=(',', ':'))
-        tag_upserts.append((app_id, payload))
+                tag_upserts.append((app_id, cleaned, rank))
     except Exception as e:
         logging.error(f"Error extracting tags for app_id {app_id}: {e}")
 
@@ -388,18 +378,15 @@ async def process_app(client: AsyncClient, app_id: int, semaphore):
     await response.aclose()
 
 
-def upsert_tags_batch(batch: list[tuple[int, str, int, int | None]]):
-    """
-    batch is a list of (app_id, tag, rank, tag_id)
-    """
+def upsert_tags_batch(batch: list[tuple[int, str, int]]):
+    """Upsert tag rankings for each app."""
     if not batch:
         return
     sql = """
-        INSERT INTO steam_game_tags (app_id, tag, rank, tag_id)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO steam_game_tags (app_id, tag, tag_rank)
+        VALUES (%s, %s, %s)
         ON DUPLICATE KEY UPDATE
-            rank = VALUES(rank),
-            tag_id = VALUES(tag_id)
+            tag_rank = VALUES(tag_rank)
     """
     try:
         cursor.executemany(sql, batch)
