@@ -7,7 +7,7 @@ from .utils import save_json
 
 
 def load_tags_table(connection) -> Dict[str, int]:
-    df_tags = pd.read_sql('SELECT tag_id FROM steam_game_tags', connection)
+    df_tags = pd.read_sql('SELECT tag_id FROM steam_tag_summary', connection)
     tag_ids = df_tags['tag_id'].unique().tolist()
     tag_id_map = {tag_id: idx for idx, tag_id in enumerate(tag_ids)}
     os.makedirs('ml/data', exist_ok=True)
@@ -38,14 +38,29 @@ def load_games_table(connection) -> pd.DataFrame:
             g.short_description,
             g.detailed_description AS long_description,
 
-            GROUP_CONCAT(CONCAT(gt.tag, ':', gt.tag_rank) ORDER BY gt.tag_rank SEPARATOR ',') AS tags_with_ranks
+            GROUP_CONCAT(CONCAT(ts.tag_id, ':', gt.tag_rank) ORDER BY gt.tag_rank SEPARATOR ',') AS tags_with_ranks
 
         FROM steam_game_details g
         LEFT JOIN steam_game_reviews r ON g.app_id = r.app_id
         LEFT JOIN steam_game_tags gt ON g.app_id = gt.app_id
+        LEFT JOIN steam_tag_summary ts ON gt.tag = ts.tag
         GROUP BY g.app_id
     """
     df = pd.read_sql(query, connection)
+
+    def parse_tag_ranks(s: str) -> List[tuple[int, int]]:
+        if not s:
+            return []
+        pairs = []
+        for part in s.split(','):
+            try:
+                tag_id_str, rank_str = part.split(':')
+                pairs.append((int(tag_id_str), int(rank_str)))
+            except ValueError:
+                continue
+        return pairs
+
+    df['tags'] = df['tags_with_ranks'].apply(parse_tag_ranks)
     return df
 
 
