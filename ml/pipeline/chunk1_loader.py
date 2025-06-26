@@ -56,8 +56,7 @@ def load_interactions_table(connection) -> pd.DataFrame:
     """
     query = """
         SELECT user_id, app_id, playtime_forever, playtime_2weeks,
-               wishlisted, wishlist_priority, date_added_to_wishlist,
-               last_played
+               wishlisted, wishlist_priority, date_added_to_wishlist
         FROM interactions
     """
     df = pd.read_sql(query, connection)
