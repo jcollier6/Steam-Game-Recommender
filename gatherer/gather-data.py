@@ -32,8 +32,8 @@ cursor = conn.cursor()
 # Regex pattern to match leading/trailing whitespace including non-breaking spaces
 whitespace_pattern = re.compile(r'^[\s\u00A0]+|[\s\u00A0]+$')
 
-# holds (app_id, tags_json_str) for current batch
-tag_upserts: list[tuple[int, str]] = []
+# holds (app_id, tag, tag_rank) tuples for current batch
+tag_upserts: list[tuple[int, str, int]] = []
 
 # holds all reviews for batch upserts
 review_upserts: list[tuple[int,int,int,int]] = []
@@ -319,21 +319,11 @@ async def process_tags(html: str, app_id: int):
         return
 
     try:
-        ranked_tags = []
         for rank, el in enumerate(tags_elements, start=1):
             raw = el.get_text()
             cleaned = whitespace_pattern.sub('', raw)
-            tag_id = el.get("data-tagid")
-
             if cleaned:
-                ranked_tags.append({
-                    "tag": cleaned,
-                    "rank": rank,
-                    "tag_id": int(tag_id) if tag_id and tag_id.isdigit() else None
-                })
-
-        payload = json.dumps({"tags": ranked_tags}, separators=(',', ':'))
-        tag_upserts.append((app_id, payload))
+                tag_upserts.append((app_id, cleaned, rank))
     except Exception as e:
         logging.error(f"Error extracting tags for app_id {app_id}: {e}")
 
@@ -388,18 +378,15 @@ async def process_app(client: AsyncClient, app_id: int, semaphore):
     await response.aclose()
 
 
-def upsert_tags_batch(batch: list[tuple[int, str, int, int | None]]):
-    """
-    batch is a list of (app_id, tag, rank, tag_id)
-    """
+def upsert_tags_batch(batch: list[tuple[int, str, int]]):
+    """Upsert tag rankings for each app."""
     if not batch:
         return
     sql = """
-        INSERT INTO steam_game_tags (app_id, tag, rank, tag_id)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO steam_game_tags (app_id, tag, tag_rank)
+        VALUES (%s, %s, %s)
         ON DUPLICATE KEY UPDATE
-            rank = VALUES(rank),
-            tag_id = VALUES(tag_id)
+            tag_rank = VALUES(tag_rank)
     """
     try:
         cursor.executemany(sql, batch)
@@ -437,16 +424,42 @@ def refresh_steam_wide_tables():
     rebuild_year_summary()
 
 def rebuild_tags_summary():
-    rebuild_sql = """
-        INSERT INTO steam_tag_summary (tag, game_count)
-        SELECT tag, COUNT(DISTINCT app_id)
-        FROM steam_game_tags,
-        JSON_TABLE(tags_json->'$.tags', '$[*]' COLUMNS(tag VARCHAR(255) PATH '$')) AS tag_table
-        GROUP BY tag
-        ON DUPLICATE KEY UPDATE game_count = VALUES(game_count);
-    """
+    """Populate ``steam_tag_summary`` with tag counts and ids."""
+
+    api_key = os.getenv("API_KEY", "")
+    url = "https://api.steampowered.com/IStoreService/GetTagList/v1/"
+
     try:
-        cursor.execute(rebuild_sql)
+        resp = httpx.get(url, params={"key": api_key, "language": "English"}, timeout=15)
+        resp.raise_for_status()
+        tags = resp.json().get("response", {}).get("tags", [])
+        tag_id_map = {t.get("name"): t.get("tagid") for t in tags}
+        logging.info(f"Fetched {len(tag_id_map)} tags from Steam API.")
+    except Exception as e:
+        logging.error(f"Failed to fetch tag ids: {e}")
+        tag_id_map = {}
+
+    try:
+        cursor.execute(
+            "SELECT tag, COUNT(DISTINCT app_id) FROM steam_game_tags GROUP BY tag"
+        )
+        rows = cursor.fetchall()
+    except Exception as e:
+        logging.error(f"Error aggregating tag counts: {e}")
+        return
+
+    insert_sql = """
+        INSERT INTO steam_tag_summary (tag, tag_id, game_count)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            tag_id = VALUES(tag_id),
+            game_count = VALUES(game_count);
+    """
+
+    data = [(tag, tag_id_map.get(tag), count) for tag, count in rows]
+
+    try:
+        cursor.executemany(insert_sql, data)
         conn.commit()
         logging.info("Rebuilt steam_tag_summary.")
     except Exception as e:
