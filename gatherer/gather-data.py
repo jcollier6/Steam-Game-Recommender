@@ -437,16 +437,42 @@ def refresh_steam_wide_tables():
     rebuild_year_summary()
 
 def rebuild_tags_summary():
-    rebuild_sql = """
-        INSERT INTO steam_tag_summary (tag, game_count)
-        SELECT tag, COUNT(DISTINCT app_id)
-        FROM steam_game_tags,
-        JSON_TABLE(tags_json->'$.tags', '$[*]' COLUMNS(tag VARCHAR(255) PATH '$')) AS tag_table
-        GROUP BY tag
-        ON DUPLICATE KEY UPDATE game_count = VALUES(game_count);
-    """
+    """Populate ``steam_tag_summary`` with tag counts and ids."""
+
+    api_key = os.getenv("API_KEY", "")
+    url = "https://api.steampowered.com/IStoreService/GetTagList/v1/"
+
     try:
-        cursor.execute(rebuild_sql)
+        resp = httpx.get(url, params={"key": api_key, "language": "English"}, timeout=15)
+        resp.raise_for_status()
+        tags = resp.json().get("response", {}).get("tags", [])
+        tag_id_map = {t.get("name"): t.get("tagid") for t in tags}
+        logging.info(f"Fetched {len(tag_id_map)} tags from Steam API.")
+    except Exception as e:
+        logging.error(f"Failed to fetch tag ids: {e}")
+        tag_id_map = {}
+
+    try:
+        cursor.execute(
+            "SELECT tag, COUNT(DISTINCT app_id) FROM steam_game_tags GROUP BY tag"
+        )
+        rows = cursor.fetchall()
+    except Exception as e:
+        logging.error(f"Error aggregating tag counts: {e}")
+        return
+
+    insert_sql = """
+        INSERT INTO steam_tag_summary (tag, tag_id, game_count)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            tag_id = VALUES(tag_id),
+            game_count = VALUES(game_count);
+    """
+
+    data = [(tag, tag_id_map.get(tag), count) for tag, count in rows]
+
+    try:
+        cursor.executemany(insert_sql, data)
         conn.commit()
         logging.info("Rebuilt steam_tag_summary.")
     except Exception as e:
