@@ -41,10 +41,10 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
     structured_min = arr.min(axis=0)
     structured_max = arr.max(axis=0)
 
-    os.makedirs('data', exist_ok=True)
-    save_numpy(arr, 'data/structured_raw.npy')
-    save_numpy(structured_min, 'data/structured_min.npy')
-    save_numpy(structured_max, 'data/structured_max.npy')
-    save_numpy(np.array(app_ids), 'data/structured_app_ids.npy')
+    os.makedirs('ml/data', exist_ok=True)
+    save_numpy(arr, 'ml/data/structured_raw.npy')
+    save_numpy(structured_min, 'ml/data/structured_min.npy')
+    save_numpy(structured_max, 'ml/data/structured_max.npy')
+    save_numpy(np.array(app_ids), 'ml/data/structured_app_ids.npy')
     print('✅ Chunk 2 structured features saved')
 

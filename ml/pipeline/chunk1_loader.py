@@ -10,7 +10,7 @@ def load_tags_table(connection) -> Dict[str, int]:
     df_tags = pd.read_sql('SELECT tag_id FROM steam_game_tags', connection)
     tag_ids = df_tags['tag_id'].unique().tolist()
     tag_id_map = {tag_id: idx for idx, tag_id in enumerate(tag_ids)}
-    os.makedirs('data', exist_ok=True)
+    os.makedirs('ml/data', exist_ok=True)
     save_json(tag_id_map, 'ml/data/tag_id_map.json')
     return tag_id_map
 
@@ -57,7 +57,7 @@ def load_interactions_table(connection) -> pd.DataFrame:
     query = """
         SELECT user_id, app_id, playtime_forever, playtime_2weeks,
                wishlisted, wishlist_priority, date_added_to_wishlist
-        FROM interactions
+        FROM user_interactions
     """
     df = pd.read_sql(query, connection)
     return df
@@ -74,7 +74,7 @@ def fetch_global_popular_games(api_key: str) -> List[int]:
     data = resp.json()
     games = data.get("response", {}).get("ranks", [])
     app_ids = [g.get("appid") for g in games if g.get("appid")]
-    save_json(app_ids, "data/global_popular_games.json")
+    save_json(app_ids, "ml/data/global_popular_games.json")
     return app_ids
 
 
@@ -87,8 +87,8 @@ def main(connection):
         raise EnvironmentError('API_KEY environment variable not set')
     fetch_global_popular_games(api_key)
 
-    games_df.to_pickle('data/games_df.pkl')
-    interactions_df.to_pickle('data/interactions_df.pkl')
+    games_df.to_pickle('ml/data/games_df.pkl')
+    interactions_df.to_pickle('ml/data/interactions_df.pkl')
     print('✅ Chunk 1 data saved')
 
 if __name__ == '__main__':

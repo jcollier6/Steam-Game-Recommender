@@ -29,11 +29,11 @@ def run_tag_pca(games_df: pd.DataFrame) -> None:
     norms[norms==0] = 1e-6
     T_pca_norm = T_pca / norms
 
-    os.makedirs('data', exist_ok=True)
-    save_numpy(T_pca_norm.astype('float32'), 'data/T_pca_norm.npy')
-    save_torch(pca, 'data/pca_tags.pkl')
-    save_numpy(np.array(app_ids), 'data/tag_pca_app_ids.npy')
+    os.makedirs('ml/data', exist_ok=True)
+    save_numpy(T_pca_norm.astype('float32'), 'ml/data/T_pca_norm.npy')
+    save_torch(pca, 'ml/data/pca_tags.pkl')
+    save_numpy(np.array(app_ids), 'ml/data/tag_pca_app_ids.npy')
     global_tag_mean = T_pca_norm.mean(axis=0)
-    save_numpy(global_tag_mean, 'data/global_tag_mean.npy')
+    save_numpy(global_tag_mean, 'ml/data/global_tag_mean.npy')
     print('✅ Chunk 3 tag PCA saved')
 

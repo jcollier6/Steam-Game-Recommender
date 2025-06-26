@@ -16,7 +16,7 @@ def main():
     chunk1_loader.main(conn)
     conn.close()
 
-    games_df = pd.read_pickle('data/games_df.pkl')
+    games_df = pd.read_pickle('ml/data/games_df.pkl')
     chunk2_structured.structured_transform(games_df, get_current_utc_date())
     chunk3_tags_pca.run_tag_pca(games_df)
     chunk4_text_pca.run_text_pca(games_df)

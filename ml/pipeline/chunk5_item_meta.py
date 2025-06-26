@@ -30,12 +30,12 @@ class ItemMetaFC(nn.Module):
 
 
 def run_item_meta_embedding() -> None:
-    structured = load_numpy('data/structured_raw.npy')
-    app_ids = load_numpy('data/structured_app_ids.npy')
-    s_min = load_numpy('data/structured_min.npy')
-    s_max = load_numpy('data/structured_max.npy')
-    T_pca_norm = load_numpy('data/T_pca_norm.npy')
-    E_pca = load_numpy('data/E_pca_all.npy')
+    structured = load_numpy('ml/data/structured_raw.npy')
+    app_ids = load_numpy('ml/data/structured_app_ids.npy')
+    s_min = load_numpy('ml/data/structured_min.npy')
+    s_max = load_numpy('ml/data/structured_max.npy')
+    T_pca_norm = load_numpy('ml/data/T_pca_norm.npy')
+    E_pca = load_numpy('ml/data/E_pca_all.npy')
 
     denom = s_max - s_min
     denom[denom == 0] = 1e-6
@@ -49,10 +49,10 @@ def run_item_meta_embedding() -> None:
         x = torch.from_numpy(item_meta_raw).float().to(device)
         embs = model(x)
     embs_np = embs.cpu().numpy().astype('float32')
-    os.makedirs('data', exist_ok=True)
-    save_numpy(embs_np, 'data/item_meta_embs.npy')
-    save_torch(model.state_dict(), 'data/item_meta_fc.pth')
+    os.makedirs('ml/data', exist_ok=True)
+    save_numpy(embs_np, 'ml/data/item_meta_embs.npy')
+    save_torch(model.state_dict(), 'ml/data/item_meta_fc.pth')
     mapping = {int(app_id): int(idx) for idx, app_id in enumerate(app_ids)}
-    save_json(mapping, 'data/app_id_to_meta_index.json')
+    save_json(mapping, 'ml/data/app_id_to_meta_index.json')
     print('✅ Chunk 5 item meta embeddings saved')
 

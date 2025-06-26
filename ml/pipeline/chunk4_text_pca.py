@@ -40,8 +40,8 @@ def run_text_pca(games_df: pd.DataFrame) -> None:
     if cumsum[255] < 0.90:
         raise RuntimeError(f'Text-PCA covers only {cumsum[255]*100:.1f}% variance')
 
-    os.makedirs('data', exist_ok=True)
-    save_numpy(E_pca.astype('float32'), 'data/E_pca_all.npy')
-    save_torch(pca, 'data/pca_text.pkl')
+    os.makedirs('ml/data', exist_ok=True)
+    save_numpy(E_pca.astype('float32'), 'ml/data/E_pca_all.npy')
+    save_torch(pca, 'ml/data/pca_text.pkl')
     print('✅ Chunk 4 text embeddings saved')
 
