@@ -14,7 +14,11 @@ def run_tag_pca(games_df: pd.DataFrame) -> None:
     for row_idx, row in games_df.iterrows():
         tags = row['tags'] or []
         for tag_id, rank in tags:
-            idx = tag_id_map[str(tag_id)]
+            key = str(tag_id)
+            if key not in tag_id_map:
+                # Skip tags that are missing from the tag_id_map
+                continue
+            idx = tag_id_map[key]
             weight = (21 - rank) / 20.0
             T_raw_all[row_idx, idx] = weight
         app_ids.append(row['app_id'])
