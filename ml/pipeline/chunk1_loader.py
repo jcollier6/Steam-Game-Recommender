@@ -7,9 +7,12 @@ from .utils import save_json
 
 
 def load_tags_table(connection) -> Dict[str, int]:
-    df_tags = pd.read_sql('SELECT tag_id FROM steam_tag_summary', connection)
-    tag_ids = df_tags['tag_id'].unique().tolist()
-    tag_id_map = {tag_id: idx for idx, tag_id in enumerate(tag_ids)}
+    df_tags = pd.read_sql(
+        'SELECT tag_id FROM steam_tag_summary WHERE tag_id IS NOT NULL',
+        connection,
+    )
+    tag_ids = df_tags['tag_id'].dropna().astype(int).unique().tolist()
+    tag_id_map = {str(tag_id): idx for idx, tag_id in enumerate(tag_ids)}
     os.makedirs('ml/data', exist_ok=True)
     save_json(tag_id_map, 'ml/data/tag_id_map.json')
     return tag_id_map
