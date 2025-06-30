@@ -37,7 +37,14 @@ The remaining chunks provide utilities for user profiling, model architecture, t
 To execute the entire pipeline inside the ML container and train the model, run:
 
 ```bash
-docker compose --profile train up ml-train
+# On Linux/macOS (bash)
+PYTHONUNBUFFERED=1 docker compose --profile train up --build ml-train
+
+# On Windows Command Prompt
+set PYTHONUNBUFFERED=1 && docker compose --profile train up --build ml-train
+
+# On Windows PowerShell
+$env:PYTHONUNBUFFERED=1; docker compose --profile train up --build ml-train
 ```
 
 This command runs `ml/pipeline/train_pipeline.py` which sequentially executes all pipeline chunks and trains the ranking model.
