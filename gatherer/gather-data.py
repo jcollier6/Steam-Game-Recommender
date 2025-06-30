@@ -38,6 +38,12 @@ tag_upserts: list[tuple[int, str, int]] = []
 # holds all reviews for batch upserts
 review_upserts: list[tuple[int,int,int,int]] = []
 
+# Utility to remove HTML tags from Steam API fields
+def strip_html(raw_html: str) -> str:
+    if not raw_html:
+        return ""
+    return BeautifulSoup(raw_html, "html.parser").get_text(" ", strip=True)
+
 # 1) Create two handlers: one for INFO→stdout, one for WARNING+→stderr
 stdout_handler = logging.StreamHandler(sys.stdout)
 stderr_handler = logging.StreamHandler(sys.stderr)
@@ -236,7 +242,8 @@ def store_game_details_in_db(new_ids_only: bool):
         recommendations_count = rec_data.get("total", 0)
 
         short_description = details.get("short_description", "")
-        detailed_description = details.get("detailed_description", "")
+        detailed_description_html = details.get("detailed_description", "")
+        detailed_description = strip_html(detailed_description_html)
 
         genres = ", ".join([g.get("description", "") for g in details.get("genres", []) if g.get("description")])
         categories = ", ".join([c.get("description", "") for c in details.get("categories", []) if c.get("description")])
