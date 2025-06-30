@@ -8,8 +8,26 @@ from .utils import load_json, save_numpy, save_torch
 def run_tag_pca(games_df: pd.DataFrame) -> None:
     tag_id_map = load_json('ml/data/tag_id_map.json')
     V = len(tag_id_map)
+    N = len(games_df)
     app_ids = []
-    T_raw_all = np.zeros((len(games_df), V), dtype=float)
+
+    # Compute document frequency for each tag
+    df_counts = np.zeros(V, dtype=int)
+    for tags in games_df['tags']:
+        if not tags:
+            continue
+        seen = set()
+        for tag_id, _ in tags:
+            key = str(tag_id)
+            if key in tag_id_map:
+                seen.add(tag_id_map[key])
+        for idx in seen:
+            df_counts[idx] += 1
+
+    # Smooth IDF as in sklearn: log((N + 1) / (df + 1)) + 1
+    idf = np.log((N + 1) / (df_counts + 1)) + 1.0
+
+    T_raw_all = np.zeros((N, V), dtype=float)
 
     for row_idx, row in games_df.iterrows():
         tags = row['tags'] or []
@@ -19,8 +37,8 @@ def run_tag_pca(games_df: pd.DataFrame) -> None:
                 # Skip tags that are missing from the tag_id_map
                 continue
             idx = tag_id_map[key]
-            weight = (21 - rank) / 20.0
-            T_raw_all[row_idx, idx] = weight
+            tf = (21 - rank) / 20.0
+            T_raw_all[row_idx, idx] = tf * idf[idx]
         app_ids.append(row['app_id'])
 
     pca = PCA(n_components=256)
