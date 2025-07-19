@@ -23,6 +23,7 @@ export class HomePageComponent implements OnInit {
   recommendedGameListExist = false;
   recentGameListExist = false;
   isReady = false;
+  steam_id: string = '';
 
   constructor(
     private gameService: GameService,
@@ -37,7 +38,9 @@ export class HomePageComponent implements OnInit {
   
 
   ngOnInit(): void {
-    this.gameService.getRecommendedGames().subscribe((data) => {
+    this.steam_id = history.state.steam_id;
+
+    this.gameService.getRecommendedGames(this.steam_id).subscribe((data) => {
       this.recommendedGames = data;
     });
 
@@ -52,7 +55,9 @@ export class HomePageComponent implements OnInit {
   }
 
   onViewAllClicked(cardGroup: string): void {
+    this.steam_id = history.state.steam_id;
+    
     localStorage.setItem('topTagNames', JSON.stringify([...this.tagNames]));
-    this.router.navigate(['/view-all'], { queryParams: { cardGroup }});
+    this.router.navigate(['/view-all', { state: { steam_id: this.steam_id } }], { queryParams: { cardGroup }});
   }
 }

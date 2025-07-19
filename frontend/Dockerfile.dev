@@ -2,10 +2,10 @@ FROM node:18
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY . .
+
 RUN npm install
 
-COPY . .
 
 # Expose Angular dev server port
 EXPOSE 4200
