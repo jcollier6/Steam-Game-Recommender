@@ -3,7 +3,7 @@ import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import requests
-import json
+from typing import Tuple
 from collections import Counter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -57,7 +57,7 @@ def get_db_connection():
     )
 
 # ─── Helper: Steam ID → Owned Games validation ─────────────────────────────────
-def is_valid_id(steam_id: str) -> (dict, str):
+def is_valid_id(steam_id: str) -> Tuple[dict, str]:
     steam_id = steam_id.strip()
     # If it looks like a SteamID64 (17 digits), validate directly
     if steam_id.isdigit() and len(steam_id) == 17:
@@ -66,7 +66,7 @@ def is_valid_id(steam_id: str) -> (dict, str):
     resolved_id = resolve_vanity(steam_id)
     return validate_steam_id(resolved_id)
 
-def validate_steam_id(steam_id: str) -> (dict, str):
+def validate_steam_id(steam_id: str) -> Tuple[dict, str]:
     url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/"
     params = {
         "key": API_KEY,
