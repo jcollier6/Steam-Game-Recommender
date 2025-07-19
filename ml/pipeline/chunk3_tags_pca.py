@@ -41,12 +41,20 @@ def run_tag_pca(games_df: pd.DataFrame) -> None:
             T_raw_all[row_idx, idx] = tf * idf[idx]
         app_ids.append(row['app_id'])
 
-    pca = PCA(n_components=256)
+    pca_full = PCA()
+    pca_full.fit(T_raw_all)            # default n_components=None → all components
+    cumvar = np.cumsum(pca_full.explained_variance_ratio_)
+    k_opt = np.searchsorted(cumvar, 0.90) + 1
+    print(f"Need k={k_opt} to cover {cumvar[k_opt-1]*100:.2f}% variance")
+
+    k = k_opt
+    pca = PCA(n_components=k)
     T_pca = pca.fit_transform(T_raw_all)
     cumsum = np.cumsum(pca.explained_variance_ratio_)
-    if cumsum[255] < 0.90:
-        raise RuntimeError(f'Tag-PCA covers only {cumsum[255]*100:.1f}% variance')
-
+    if cumsum[k-1] < 0.90:
+        raise RuntimeError(f'Tag-PCA covers only {cumsum[k-1]*100:.1f}% variance')
+    print(f'Tag-PCA covers {cumsum[k-1]*100:.1f}% variance')
+    
     norms = np.linalg.norm(T_pca, axis=1, keepdims=True)
     norms[norms==0] = 1e-6
     T_pca_norm = T_pca / norms
