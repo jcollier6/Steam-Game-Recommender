@@ -47,18 +47,24 @@ def run_text_pca(games_df: pd.DataFrame) -> None:
     E_raw = embed_texts(games_df, device)
 
     # 1. Fit full PCA to determine optimal k for 90% variance
-    pca_full = PCA()
+    #    Use a deterministic solver so that re-fitting with a subset of
+    #    components produces identical variance ratios.  Otherwise, the
+    #    default ``svd_solver='auto'`` may fall back to the randomized
+    #    solver when ``n_components`` is small, which caused the re-fit to
+    #    explain slightly less variance (e.g. 89.9% vs the expected 90%).
+    pca_full = PCA(svd_solver='full')
     pca_full.fit(E_raw)
     cumvar = np.cumsum(pca_full.explained_variance_ratio_)
     k_opt = np.searchsorted(cumvar, 0.90) + 1
     print(f"Optimal number of components to cover 90% variance: {k_opt}")
 
-    # 2. Re-fit PCA with optimal components
-    pca = PCA(n_components=k_opt)
+    # 2. Re-fit PCA with optimal components using the same deterministic
+    #    solver to avoid variance drift.
+    pca = PCA(n_components=k_opt, svd_solver='full')
     E_pca = pca.fit_transform(E_raw)
     cumsum = np.cumsum(pca.explained_variance_ratio_)
-    if cumsum[k_opt-1] < 0.90:
-        raise RuntimeError(f'Text-PCA covers only {cumsum[k_opt-1]*100:.1f}% variance')
+    if cumsum[-1] < 0.90:
+        raise RuntimeError(f'Text-PCA covers only {cumsum[-1]*100:.1f}% variance')
 
     # 3. Save outputs
     os.makedirs('ml/data', exist_ok=True)
