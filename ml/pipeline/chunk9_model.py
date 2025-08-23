@@ -7,7 +7,10 @@ class UserMetaFC(nn.Module):
     def __init__(self, input_dim: int):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, 256)
-        self.bn1 = nn.BatchNorm1d(256)
+        # BatchNorm1d requires a batch size > 1 when training which isn't
+        # guaranteed in the pairwise ranking loop. LayerNorm works on a single
+        # example, so switch to it to avoid runtime errors.
+        self.bn1 = nn.LayerNorm(256)
         self.fc2 = nn.Linear(256, 128)
 
     def forward(self, x):
@@ -22,9 +25,9 @@ class ScoreMLP(nn.Module):
     def __init__(self):
         super().__init__()
         self.fc1 = nn.Linear(512, 512)
-        self.bn1 = nn.BatchNorm1d(512)
+        self.bn1 = nn.LayerNorm(512)
         self.fc2 = nn.Linear(512, 256)
-        self.bn2 = nn.BatchNorm1d(256)
+        self.bn2 = nn.LayerNorm(256)
         self.fc3 = nn.Linear(256, 1)
 
     def forward(self, x):
