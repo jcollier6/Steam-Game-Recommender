@@ -8,9 +8,9 @@ from .utils import load_numpy, save_numpy, save_torch, save_json
 
 
 class ItemMetaFC(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim: int):
         super().__init__()
-        self.fc1 = nn.Linear(522, 512)
+        self.fc1 = nn.Linear(input_dim, 512)
         self.bn1 = nn.BatchNorm1d(512)
         self.fc2 = nn.Linear(512, 256)
         self.bn2 = nn.BatchNorm1d(256)
@@ -43,7 +43,7 @@ def run_item_meta_embedding() -> None:
     item_meta_raw = np.concatenate([structured_norm, T_pca_norm, E_pca], axis=1)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = ItemMetaFC().to(device)
+    model = ItemMetaFC(item_meta_raw.shape[1]).to(device)
     model.eval()
     with torch.no_grad():
         x = torch.from_numpy(item_meta_raw).float().to(device)

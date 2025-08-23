@@ -52,17 +52,21 @@ def _sample_negative(user_pos: List[int], global_popular: List[int]) -> int:
     return int(np.random.choice(candidates))
 
 
-def train_model(num_epochs: int = 1, batch_size: int = 256) -> None:
-    interactions = pd.read_pickle("data/interactions_df.pkl")
+def train_model(num_epochs: int = 1, batch_size: int = 256, data_dir: str | None = None) -> None:
+    if data_dir is None:
+        data_dir = os.getenv("ML_DATA_DIR", "ml/data")
+    interactions = pd.read_pickle(os.path.join(data_dir, "interactions_df.pkl"))
     splits = _split_by_user(interactions)
     user_ids = sorted(splits.keys())
     user_id_map = build_id_to_index_map(user_ids)
-    save_json(user_id_map, "data/user_id_to_index.json")
-    app_id_to_index = load_json("data/app_id_to_meta_index.json")
-    global_popular = load_json("data/global_popular_games.json")
+    save_json(user_id_map, os.path.join(data_dir, "user_id_to_index.json"))
+    app_id_to_index = load_json(os.path.join(data_dir, "app_id_to_meta_index.json"))
+    global_popular = load_json(os.path.join(data_dir, "global_popular_games.json"))
+
+    tag_dim = load_numpy(os.path.join(data_dir, "T_pca_norm.npy")).shape[1]
 
     tables = EmbeddingTables(len(user_ids), len(app_id_to_index))
-    user_meta_fc = UserMetaFC()
+    user_meta_fc = UserMetaFC(tag_dim + 1)
     score_mlp = ScoreMLP()
 
     params = list(tables.user_emb.parameters()) + list(tables.item_emb.parameters())
@@ -71,7 +75,7 @@ def train_model(num_epochs: int = 1, batch_size: int = 256) -> None:
     steps_per_epoch = ceil(len(user_ids) / batch_size)
     scheduler = get_cosine_schedule_with_warmup(optimizer, steps_per_epoch, num_epochs * steps_per_epoch)
 
-    item_meta_embs = load_numpy("data/item_meta_embs.npy")
+    item_meta_embs = load_numpy(os.path.join(data_dir, "item_meta_embs.npy"))
 
     for epoch in range(num_epochs):
         np.random.shuffle(user_ids)
@@ -97,7 +101,7 @@ def train_model(num_epochs: int = 1, batch_size: int = 256) -> None:
                 pos_emb = tables.item_emb(torch.tensor([pos_idx]))
                 neg_emb = tables.item_emb(torch.tensor([neg_idx]))
 
-                _, _, meta_raw = compute_user_meta_raw(u, interactions)
+                _, _, meta_raw = compute_user_meta_raw(u, interactions, data_dir)
                 user_meta_emb = user_meta_fc(torch.tensor(meta_raw).float().unsqueeze(0))
 
                 pos_meta = torch.from_numpy(item_meta_embs[pos_idx]).float().unsqueeze(0)
@@ -119,9 +123,9 @@ def train_model(num_epochs: int = 1, batch_size: int = 256) -> None:
         print(f"epoch {epoch} loss {epoch_loss/steps_per_epoch:.4f}")
 
     tables.compute_means()
-    tables.save("data/emb_tables")
-    save_checkpoint(user_meta_fc.state_dict(), "data/user_meta_fc.pth")
-    save_checkpoint(score_mlp.state_dict(), "data/score_mlp.pth")
+    tables.save(os.path.join(data_dir, "emb_tables"))
+    save_checkpoint(user_meta_fc.state_dict(), os.path.join(data_dir, "user_meta_fc.pth"))
+    save_checkpoint(score_mlp.state_dict(), os.path.join(data_dir, "score_mlp.pth"))
 
 
 if __name__ == "__main__":

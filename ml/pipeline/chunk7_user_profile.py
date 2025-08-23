@@ -14,9 +14,9 @@ from .utils import (
 ALPHA = compute_alpha(30)
 
 
-def compute_user_meta_raw(user_id: int, interactions_df: pd.DataFrame, data_dir: str = None):
+def compute_user_meta_raw(user_id: int, interactions_df: pd.DataFrame, data_dir: str | None = None):
     if data_dir is None:
-        data_dir = os.getenv("ML_DATA_DIR", "data")
+        data_dir = os.getenv("ML_DATA_DIR", "ml/data")
     T_pca_norm = load_numpy(os.path.join(data_dir, 'T_pca_norm.npy'))
     app_ids = load_numpy(os.path.join(data_dir, 'structured_app_ids.npy')).tolist()
     app_id_to_index = build_id_to_index_map(app_ids)
