@@ -20,7 +20,8 @@ def recommend(
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if data_dir is None:
         data_dir = os.getenv('ML_DATA_DIR', 'ml/data')
-    user_meta_fc = UserMetaFC().to(device)
+    tag_dim = load_numpy(os.path.join(data_dir, 'T_pca_norm.npy')).shape[1]
+    user_meta_fc = UserMetaFC(tag_dim + 1).to(device)
     score_mlp = ScoreMLP().to(device)
     user_meta_fc.load_state_dict(load_torch(os.path.join(data_dir, 'user_meta_fc.pth'), device))
     score_mlp.load_state_dict(load_torch(os.path.join(data_dir, 'score_mlp.pth'), device))

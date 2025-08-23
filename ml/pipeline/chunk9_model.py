@@ -4,9 +4,9 @@ import torch.nn.functional as F
 
 
 class UserMetaFC(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim: int):
         super().__init__()
-        self.fc1 = nn.Linear(257, 256)
+        self.fc1 = nn.Linear(input_dim, 256)
         self.bn1 = nn.BatchNorm1d(256)
         self.fc2 = nn.Linear(256, 128)
 
