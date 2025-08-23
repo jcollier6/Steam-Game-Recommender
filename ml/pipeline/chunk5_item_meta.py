@@ -36,6 +36,26 @@ def run_item_meta_embedding() -> None:
     s_max = load_numpy('ml/data/structured_max.npy')
     T_pca_norm = load_numpy('ml/data/T_pca_norm.npy')
     E_pca = load_numpy('ml/data/E_pca_all.npy')
+    tag_app_ids = load_numpy('ml/data/tag_pca_app_ids.npy')
+
+    tag_idx_map = {int(aid): idx for idx, aid in enumerate(tag_app_ids)}
+    structured_f = []
+    T_f = []
+    E_f = []
+    app_ids_f = []
+    for idx, aid in enumerate(app_ids):
+        t_idx = tag_idx_map.get(int(aid))
+        if t_idx is None:
+            continue
+        structured_f.append(structured[idx])
+        T_f.append(T_pca_norm[t_idx])
+        E_f.append(E_pca[t_idx])
+        app_ids_f.append(aid)
+
+    structured = np.array(structured_f)
+    T_pca_norm = np.array(T_f)
+    E_pca = np.array(E_f)
+    app_ids = np.array(app_ids_f)
 
     denom = s_max - s_min
     denom[denom == 0] = 1e-6
