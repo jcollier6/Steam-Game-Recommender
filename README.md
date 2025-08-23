@@ -52,6 +52,6 @@ This command runs `ml/pipeline/train_pipeline.py` which sequentially executes al
 To resume from a specific chunk, set the `START_CHUNK` environment variable. For example, to begin at chunk 5:
 
 ```bash
-START_CHUNK=5 PYTHONUNBUFFERED=1 docker compose --profile train up --build ml-train
+set START_CHUNK=5 && set PYTHONUNBUFFERED=1 && docker compose --profile train up --build ml-train
 ```
 
