@@ -49,3 +49,9 @@ $env:PYTHONUNBUFFERED=1; docker compose --profile train up --build ml-train
 
 This command runs `ml/pipeline/train_pipeline.py` which sequentially executes all pipeline chunks and trains the ranking model.
 
+To resume from a specific chunk, set the `START_CHUNK` environment variable. For example, to begin at chunk 5:
+
+```bash
+START_CHUNK=5 PYTHONUNBUFFERED=1 docker compose --profile train up --build ml-train
+```
+

@@ -1,5 +1,6 @@
 import os
 import time
+import argparse
 from .utils import get_current_utc_date
 import pandas as pd
 import mysql.connector
@@ -16,9 +17,51 @@ from . import (
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--start",
+        type=int,
+        default=1,
+        help="first chunk to execute (1–6 or 10)",
+    )
+    args = parser.parse_args()
+
     start_time = time.time()
     step = 0
-    total_steps = 7
+
+    conn = mysql.connector.connect(
+        host=os.getenv("MYSQL_HOST"),
+        user=os.getenv("MYSQL_USER"),
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DATABASE"),
+    )
+
+    epochs = int(os.getenv("NUM_EPOCHS", "1"))
+
+    games_df_cache = {}
+
+    def load_games_df():
+        if "games_df" not in games_df_cache:
+            games_df_cache["games_df"] = pd.read_pickle("ml/data/games_df.pkl")
+        return games_df_cache["games_df"]
+
+    steps = [
+        ("chunk1", lambda: chunk1_loader.main(conn)),
+        (
+            "chunk2",
+            lambda: chunk2_structured.structured_transform(
+                load_games_df(), get_current_utc_date()
+            ),
+        ),
+        ("chunk3", lambda: chunk3_tags_pca.run_tag_pca(load_games_df())),
+        ("chunk4", lambda: chunk4_text_pca.run_text_pca(load_games_df())),
+        ("chunk5", chunk5_item_meta.run_item_meta_embedding),
+        ("chunk6", chunk6_faiss.build_faiss_indices),
+        ("chunk10", lambda: chunk10_train.train_model(num_epochs=epochs)),
+    ]
+
+    steps_to_run = steps[args.start - 1 :]
+    total_steps = len(steps_to_run)
 
     def run_step(name, func):
         """Execute *func* and print progress with timing and ETA."""
@@ -37,28 +80,14 @@ def main():
         )
         return result
 
-    conn = mysql.connector.connect(
-        host=os.getenv('MYSQL_HOST'),
-        user=os.getenv('MYSQL_USER'),
-        password=os.getenv('MYSQL_PASSWORD'),
-        database=os.getenv('MYSQL_DATABASE'),
-    )
-    run_step("chunk1", lambda: chunk1_loader.main(conn))
+    for name, func in steps_to_run:
+        run_step(name, func)
+
     conn.close()
-
-    games_df = pd.read_pickle('ml/data/games_df.pkl')
-    run_step("chunk2", lambda: chunk2_structured.structured_transform(games_df, get_current_utc_date()))
-    run_step("chunk3", lambda: chunk3_tags_pca.run_tag_pca(games_df))
-    run_step("chunk4", lambda: chunk4_text_pca.run_text_pca(games_df))
-    run_step("chunk5", chunk5_item_meta.run_item_meta_embedding)
-    run_step("chunk6", chunk6_faiss.build_faiss_indices)
-
-    epochs = int(os.getenv('NUM_EPOCHS', '1'))
-    run_step("chunk10", lambda: chunk10_train.train_model(num_epochs=epochs))
 
     total_elapsed = time.time() - start_time
     print(f"Pipeline finished in {total_elapsed:.1f}s", flush=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

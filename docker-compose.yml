@@ -129,7 +129,7 @@ services:
     gpus: all
     profiles: ["train"]
     working_dir: /app
-    command: python -m ml.pipeline.train_pipeline
+    command: python -m ml.pipeline.train_pipeline --start ${START_CHUNK:-1}
       
   recommender:
     build:
