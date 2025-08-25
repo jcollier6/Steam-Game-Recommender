@@ -138,7 +138,7 @@ services:
     command: uvicorn recommend_games:app --host 0.0.0.0 --port 8001
     working_dir: /app/ml
     environment:
-      - ML_DATA_DIR=/app/data
+      - ML_DATA_DIR=/app/ml/data
       - API_KEY=${API_KEY}
     volumes:
       - .:/app
