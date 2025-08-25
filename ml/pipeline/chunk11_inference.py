@@ -10,6 +10,20 @@ from .chunk8_embeddings import EmbeddingTables
 from .chunk7_user_profile import compute_user_meta_raw
 
 
+def _filter_unique(candidates, K, exclude_ids):
+    seen = set(int(x) for x in exclude_ids)
+    results = []
+    for c in candidates:
+        app_id = int(c['app_id']) if isinstance(c, dict) else int(c)
+        if app_id in seen:
+            continue
+        seen.add(app_id)
+        results.append(c)
+        if len(results) >= K:
+            break
+    return results
+
+
 def recommend(
     user_id: int,
     interactions_df,
@@ -62,10 +76,10 @@ def recommend(
             user_df = lib
         else:
             popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
-            return popular[:K]
+            return _filter_unique(popular, K, lib['app_id'].astype(int).tolist())
     elif user_df.empty:
         popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
-        return popular[:K]
+        return _filter_unique(popular, K, [])
 
     pos_mask_df = (
         (user_df['playtime_forever'] > 0)
@@ -74,7 +88,7 @@ def recommend(
     )
     if pos_mask_df.sum() < 20:
         popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
-        return popular[:K]
+        return _filter_unique(popular, K, user_df['app_id'].astype(int).tolist())
 
     _, _, user_meta_raw = compute_user_meta_raw(user_id, user_df, data_dir)
     with torch.no_grad():
@@ -121,5 +135,4 @@ def recommend(
             scores.append(s.item())
 
     ranked = [x for _, x in sorted(zip(scores, candidate_ids), key=lambda t: t[0], reverse=True)]
-    return ranked[:K]
-
+    return _filter_unique(ranked, K, user_df['app_id'].astype(int).tolist())
