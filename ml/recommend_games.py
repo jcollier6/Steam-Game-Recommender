@@ -17,7 +17,25 @@ logging.basicConfig(
 )
 
 DATA_DIR = os.getenv("ML_DATA_DIR", "ml/data")
-INTERACTIONS_DF = pd.read_pickle(os.path.join(DATA_DIR, "interactions_df.pkl"))
+_interactions_path = os.path.join(DATA_DIR, "interactions_df.pkl")
+if os.path.exists(_interactions_path):
+    INTERACTIONS_DF = pd.read_pickle(_interactions_path)
+else:
+    logging.warning(
+        "interactions_df.pkl not found at %s. Using empty interactions dataframe.",
+        _interactions_path,
+    )
+    INTERACTIONS_DF = pd.DataFrame(
+        columns=[
+            "user_id",
+            "app_id",
+            "playtime_forever",
+            "playtime_2weeks",
+            "wishlisted",
+            "wishlist_priority",
+            "date_added_to_wishlist",
+        ]
+    )
 
 app = FastAPI()
 
