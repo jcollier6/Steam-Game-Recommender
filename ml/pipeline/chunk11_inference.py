@@ -95,8 +95,23 @@ def recommend(
         user_meta_emb = user_meta_fc(torch.tensor(user_meta_raw).float().unsqueeze(0).to(device))
     user_meta_norm = user_meta_emb / user_meta_emb.norm(dim=1, keepdim=True)
     query_vec = user_meta_norm.cpu().numpy().astype('float32')
-    _, cand_idxs = index_meta.search(query_vec, 500)
-    candidate_ids = [index_to_app[i] if isinstance(index_to_app, list) else index_to_app[str(i)] for i in cand_idxs[0]]
+    # Fetch more than K neighbors so that de-duplication still yields
+    # enough items for scoring. We cap the search at the index size.
+    search_k = min(index_meta.ntotal, max(500, K * 10))
+    _, cand_idxs = index_meta.search(query_vec, search_k)
+
+    # Map FAISS indices to app IDs and remove duplicates while preserving
+    # order, collecting a pool bigger than the final K recommendations.
+    candidate_ids = []
+    seen_cands: set[int] = set()
+    for idx in cand_idxs[0]:
+        app_id = index_to_app[idx] if isinstance(index_to_app, list) else index_to_app[str(idx)]
+        if app_id in seen_cands:
+            continue
+        seen_cands.add(app_id)
+        candidate_ids.append(app_id)
+        if len(candidate_ids) >= search_k:
+            break
 
     scores = []
     with torch.no_grad():
@@ -135,4 +150,16 @@ def recommend(
             scores.append(s.item())
 
     ranked = [x for _, x in sorted(zip(scores, candidate_ids), key=lambda t: t[0], reverse=True)]
-    return _filter_unique(ranked, K, user_df['app_id'].astype(int).tolist())
+
+    # Remove duplicates and items the user already owns.
+    exclude_ids = user_df['app_id'].astype(int).tolist()
+    recs = _filter_unique(ranked, K, exclude_ids)
+
+    # If FAISS produced too many duplicates, backfill with popular titles to
+    # still return K unique recommendations.
+    if len(recs) < K:
+        popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
+        exclude = exclude_ids + [int(r['app_id']) if isinstance(r, dict) else int(r) for r in recs]
+        recs.extend(_filter_unique(popular, K - len(recs), exclude))
+
+    return recs
