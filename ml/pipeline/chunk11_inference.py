@@ -90,28 +90,32 @@ def recommend(
         popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
         return _filter_unique(popular, K, user_df['app_id'].astype(int).tolist())
 
+    owned_ids = user_df['app_id'].astype(int).tolist()
+    exclude_ids: set[int] = set(owned_ids)
+
     _, _, user_meta_raw = compute_user_meta_raw(user_id, user_df, data_dir)
     with torch.no_grad():
         user_meta_emb = user_meta_fc(torch.tensor(user_meta_raw).float().unsqueeze(0).to(device))
     user_meta_norm = user_meta_emb / user_meta_emb.norm(dim=1, keepdim=True)
     query_vec = user_meta_norm.cpu().numpy().astype('float32')
-    # Fetch more than K neighbors so that de-duplication still yields
-    # enough items for scoring. We cap the search at the index size.
-    search_k = min(index_meta.ntotal, max(500, K * 10))
-    _, cand_idxs = index_meta.search(query_vec, search_k)
 
-    # Map FAISS indices to app IDs and remove duplicates while preserving
-    # order, collecting a pool bigger than the final K recommendations.
-    candidate_ids = []
-    seen_cands: set[int] = set()
-    for idx in cand_idxs[0]:
-        app_id = index_to_app[idx] if isinstance(index_to_app, list) else index_to_app[str(idx)]
-        if app_id in seen_cands:
-            continue
-        seen_cands.add(app_id)
-        candidate_ids.append(app_id)
-        if len(candidate_ids) >= search_k:
-            break
+    # Query FAISS in batches until we gather at least K unique, unowned items
+    batch_size = max(500, K * 10)
+    candidate_ids: list[int] = []
+    seen_cands: set[int] = set(exclude_ids)
+    search_k = 0
+    while len(candidate_ids) < K and search_k < index_meta.ntotal:
+        search_k = min(search_k + batch_size, index_meta.ntotal)
+        _, cand_idxs = index_meta.search(query_vec, search_k)
+        start = max(0, search_k - batch_size)
+        for idx in cand_idxs[0][start:search_k]:
+            app_id = index_to_app[idx] if isinstance(index_to_app, list) else index_to_app[str(idx)]
+            if app_id in seen_cands:
+                continue
+            seen_cands.add(app_id)
+            candidate_ids.append(app_id)
+            if len(candidate_ids) >= K:
+                break
 
     scores = []
     with torch.no_grad():
@@ -152,14 +156,13 @@ def recommend(
     ranked = [x for _, x in sorted(zip(scores, candidate_ids), key=lambda t: t[0], reverse=True)]
 
     # Remove duplicates and items the user already owns.
-    exclude_ids = user_df['app_id'].astype(int).tolist()
     recs = _filter_unique(ranked, K, exclude_ids)
 
     # If FAISS produced too many duplicates, backfill with popular titles to
     # still return K unique recommendations.
     if len(recs) < K:
         popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
-        exclude = exclude_ids + [int(r['app_id']) if isinstance(r, dict) else int(r) for r in recs]
+        exclude = owned_ids + [int(r['app_id']) if isinstance(r, dict) else int(r) for r in recs]
         recs.extend(_filter_unique(popular, K - len(recs), exclude))
 
     return recs
