@@ -215,6 +215,7 @@ def store_game_details_in_db(new_ids_only: bool):
         if isinstance(price_overview, (dict, list)):
             price_overview = json.dumps(price_overview)
 
+
         release_date_info = details.get("release_date", {})
         coming_soon = 1 if release_date_info.get("coming_soon", False) else 0
         
