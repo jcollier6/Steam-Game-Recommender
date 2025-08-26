@@ -45,6 +45,12 @@ def strip_html(raw_html: str) -> str:
     return BeautifulSoup(raw_html, "html.parser").get_text(" ", strip=True)
 
 
+def serialize_if_needed(value):
+    """Convert lists or dictionaries to JSON strings for database storage."""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value)
+    return value
+
 def extract_supported_languages(raw: str | None) -> str | None:
     """Convert the Steam API's supported_languages string to JSON array."""
     if not raw:
@@ -230,7 +236,6 @@ def store_game_details_in_db(new_ids_only: bool):
         if isinstance(price_overview, (dict, list)):
             price_overview = json.dumps(price_overview)
 
-
         release_date_info = details.get("release_date", {})
         coming_soon = 1 if release_date_info.get("coming_soon", False) else 0
         
@@ -283,6 +288,7 @@ def store_game_details_in_db(new_ids_only: bool):
             short_description, detailed_description, genres, categories, supported_languages, developer, publisher, platforms,
             recommendations, raw_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
+
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             name = VALUES(name), coming_soon = VALUES(coming_soon), release_date = VALUES(release_date),
