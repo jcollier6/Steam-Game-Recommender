@@ -210,9 +210,11 @@ def store_game_details_in_db(new_ids_only: bool):
         name = details.get("name", "")
         is_free = 1 if details.get("is_free", False) else 0
 
-        # Extract price overview and store as JSON if present
-        price_overview_data = details.get("price_overview")
-        price_overview = json.dumps(price_overview_data) if price_overview_data else None
+        # Extract price overview
+        price_overview = details.get("price_overview")
+        if isinstance(price_overview, (dict, list)):
+            price_overview = json.dumps(price_overview)
+
 
         release_date_info = details.get("release_date", {})
         coming_soon = 1 if release_date_info.get("coming_soon", False) else 0
@@ -275,10 +277,31 @@ def store_game_details_in_db(new_ids_only: bool):
             screenshot2 = VALUES(screenshot2), screenshot3 = VALUES(screenshot3), screenshot4 = VALUES(screenshot4)
         """
         vals = (
-            app_id, name, coming_soon, release_date, price_overview, is_free,
-            short_description, detailed_description, genres, categories, developers, publishers, platforms,
-            recommendations_count, raw_data_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
+            app_id,
+            name,
+            coming_soon,
+            release_date,
+            price_overview,
+            is_free,
+            short_description,
+            detailed_description,
+            genres,
+            categories,
+            developers,
+            publishers,
+            platforms,
+            recommendations_count,
+            raw_data_json,
+            header_image,
+            screenshot1,
+            screenshot2,
+            screenshot3,
+            screenshot4,
         )
+
+        if any(isinstance(v, (dict, list)) for v in vals):
+            logging.error(f"Unserializable field detected for app_id={app_id}")
+            continue
 
         try:
             cursor.execute(upsert_sql, vals)
