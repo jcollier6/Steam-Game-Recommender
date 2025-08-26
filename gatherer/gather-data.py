@@ -51,6 +51,20 @@ def serialize_if_needed(value):
         return json.dumps(value)
     return value
 
+def extract_supported_languages(raw: str | None) -> str | None:
+    """Convert the Steam API's supported_languages string to JSON array."""
+    if not raw:
+        return None
+    # Take only the first segment before any <br> (drops explanatory notes)
+    raw = raw.split("<br")[0]
+    # Remove HTML tags, NBSP, control chars and asterisks
+    cleaned = BeautifulSoup(raw, "html.parser").get_text(" ", strip=True)
+    cleaned = cleaned.replace("\u00A0", " ")
+    cleaned = re.sub(r"[\x00-\x1F\x7F]", "", cleaned)
+    cleaned = cleaned.replace("*", "")
+    languages = [lang.strip() for lang in cleaned.split(",") if lang.strip()]
+    return json.dumps(languages, ensure_ascii=False) if languages else None
+
 # 1) Create two handlers: one for INFO→stdout, one for WARNING+→stderr
 stdout_handler = logging.StreamHandler(sys.stdout)
 stderr_handler = logging.StreamHandler(sys.stderr)
@@ -257,6 +271,9 @@ def store_game_details_in_db(new_ids_only: bool):
         genres = ", ".join([g.get("description", "") for g in details.get("genres", []) if g.get("description")])
         categories = ", ".join([c.get("description", "") for c in details.get("categories", []) if c.get("description")])
 
+        supported_languages_raw = details.get("supported_languages")
+        supported_languages = extract_supported_languages(supported_languages_raw)
+
         developers = ", ".join(details.get("developers", []))
         publishers = ", ".join(details.get("publishers", []))
 
@@ -267,44 +284,26 @@ def store_game_details_in_db(new_ids_only: bool):
 
         upsert_sql = """
         INSERT INTO steam_game_details (
-            app_id, name, coming_soon, release_date, price_overview, is_free, 
-            short_description, detailed_description, genres, categories, developer, publisher, platforms,
+            app_id, name, coming_soon, release_date, price_overview, is_free,
+            short_description, detailed_description, genres, categories, supported_languages, developer, publisher, platforms,
             recommendations, raw_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             name = VALUES(name), coming_soon = VALUES(coming_soon), release_date = VALUES(release_date),
             price_overview = VALUES(price_overview), is_free = VALUES(is_free), short_description = VALUES(short_description),
             detailed_description = VALUES(detailed_description), genres = VALUES(genres), categories = VALUES(categories),
-            developer = VALUES(developer), publisher = VALUES(publisher), platforms = VALUES(platforms),
+            supported_languages = VALUES(supported_languages), developer = VALUES(developer), publisher = VALUES(publisher), platforms = VALUES(platforms),
             recommendations = VALUES(recommendations), raw_json = VALUES(raw_json),
             fetched_at = CURRENT_TIMESTAMP,
             header_image = VALUES(header_image), screenshot1 = VALUES(screenshot1),
             screenshot2 = VALUES(screenshot2), screenshot3 = VALUES(screenshot3), screenshot4 = VALUES(screenshot4)
         """
-        vals = tuple(
-            serialize_if_needed(v) for v in (
-                app_id,
-                name,
-                coming_soon,
-                release_date,
-                price_overview,
-                is_free,
-                short_description,
-                detailed_description,
-                genres,
-                categories,
-                developers,
-                publishers,
-                platforms,
-                recommendations_count,
-                raw_data_json,
-                header_image,
-                screenshot1,
-                screenshot2,
-                screenshot3,
-                screenshot4,
-            )
+        vals = (
+            app_id, name, coming_soon, release_date, price_overview, is_free,
+            short_description, detailed_description, genres, categories, supported_languages, developers, publishers, platforms,
+            recommendations_count, raw_data_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
 
         if any(isinstance(v, (dict, list)) for v in vals):
