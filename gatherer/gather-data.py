@@ -210,8 +210,9 @@ def store_game_details_in_db(new_ids_only: bool):
         name = details.get("name", "")
         is_free = 1 if details.get("is_free", False) else 0
 
-        # Extract price overview
-        price_overview = details.get("price_overview", {})
+        # Extract price overview and store as JSON if present
+        price_overview_data = details.get("price_overview")
+        price_overview = json.dumps(price_overview_data) if price_overview_data else None
 
         release_date_info = details.get("release_date", {})
         coming_soon = 1 if release_date_info.get("coming_soon", False) else 0
@@ -262,7 +263,7 @@ def store_game_details_in_db(new_ids_only: bool):
             short_description, detailed_description, genres, categories, developer, publisher, platforms,
             recommendations, raw_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             name = VALUES(name), coming_soon = VALUES(coming_soon), release_date = VALUES(release_date),
             price_overview = VALUES(price_overview), is_free = VALUES(is_free), short_description = VALUES(short_description),
