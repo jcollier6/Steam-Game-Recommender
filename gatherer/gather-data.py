@@ -807,9 +807,8 @@ def main():
     else:
         logging.info(
             "Please use --type then one of: all-ids, gather-new-games-info, "
-            "gather-all-games-info, gather-all-games-tags, gather-new-games-tags, "
-            "gather-all-games-reviews-and-tags, gather-new-games-reviews-and-tags, "
-            "refresh-steam-wide-tables"
+            "gather-all-games-info, gather-all-games-reviews-and-tags, gather-new-games-reviews-and-tags, "
+            "gather-batch-games-reviews-and-tags, refresh-steam-wide-tables"
         )
 
     cursor.close()
