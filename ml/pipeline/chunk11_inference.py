@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import pandas as pd
 import torch
@@ -8,6 +9,17 @@ from .utils import load_numpy, load_json, load_torch
 from .chunk9_model import UserMetaFC, ScoreMLP
 from .chunk8_embeddings import EmbeddingTables
 from .chunk7_user_profile import compute_user_meta_raw
+
+
+def _load_structured_schema(data_dir: str):
+    schema_path = os.path.join(data_dir, 'structured_schema.json')
+    if not os.path.exists(schema_path):
+        return None
+    try:
+        with open(schema_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 def _filter_unique(candidates, K, exclude_ids):
@@ -31,6 +43,13 @@ def recommend(
     data_dir: str | None = None,
     user_library_df: pd.DataFrame | None = None,
 ):
+    # Load structured scaling schema for reproducibility logs and potential transforms
+    schema = _load_structured_schema(data_dir or os.getenv('ML_DATA_DIR', 'ml/data'))
+    if schema is not None:
+        snap = schema.get('snapshot_date')
+        cols = schema.get('columns', [])
+        print(f"structured schema loaded: snapshot_date={snap}, columns={len(cols)}", flush=True)
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if data_dir is None:
         data_dir = os.getenv('ML_DATA_DIR', 'ml/data')
@@ -108,14 +127,18 @@ def recommend(
         search_k = min(search_k + batch_size, index_meta.ntotal)
         _, cand_idxs = index_meta.search(query_vec, search_k)
         start = max(0, search_k - batch_size)
+        new_batch = []
         for idx in cand_idxs[0][start:search_k]:
             app_id = index_to_app[idx] if isinstance(index_to_app, list) else index_to_app[str(idx)]
             if app_id in seen_cands:
                 continue
             seen_cands.add(app_id)
             candidate_ids.append(app_id)
+            new_batch.append(app_id)
             if len(candidate_ids) >= K:
                 break
+        print(f"searched {search_k}, new apps {new_batch}")
+
 
     scores = []
     with torch.no_grad():

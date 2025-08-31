@@ -3,6 +3,7 @@ import time
 import argparse
 from .utils import get_current_utc_date
 import pandas as pd
+import numpy as np
 import mysql.connector
 
 from . import (
@@ -22,7 +23,16 @@ def main():
         "--start",
         type=int,
         default=1,
-        help="first chunk to execute (1–6 or 10)",
+        help=(
+            "chunk selector. 1 = run full pipeline; >1 = run only that chunk. "
+            "Allowed values: 1–6 or 10 (10 selects the 'chunk10' step)."
+        ),
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        help="override NUM_EPOCHS env for chunk10 training",
     )
     args = parser.parse_args()
 
@@ -36,7 +46,10 @@ def main():
         database=os.getenv("MYSQL_DATABASE"),
     )
 
-    epochs = int(os.getenv("NUM_EPOCHS", "1"))
+    epochs_env = os.getenv("NUM_EPOCHS")
+    epochs = int(epochs_env) if epochs_env else None
+    if args.epochs is not None:
+        epochs = max(1, int(args.epochs))
 
     games_df_cache = {}
 
@@ -60,7 +73,32 @@ def main():
         ("chunk10", lambda: chunk10_train.train_model(num_epochs=epochs)),
     ]
 
-    steps_to_run = steps[args.start - 1 :]
+    # Determine execution mode: full pipeline starting at 1, or single chunk
+    start_idx = max(1, int(args.start))
+    run_single = start_idx != 1
+
+    # Allowed numeric selectors for single-run
+    allowed_single = {2, 3, 4, 5, 6, 10}
+    if run_single and start_idx not in allowed_single:
+        raise SystemExit(
+            f"Invalid --start {start_idx}. Allowed single chunks: {sorted(allowed_single)}; use 1 for full pipeline."
+        )
+
+    # Map of index->(name, func)
+    steps_map = {i + 1: pair for i, pair in enumerate(steps)}
+
+    # Translate 10 → the step name 'chunk10'
+    if start_idx == 10:
+        for i, (nm, _) in enumerate(steps, start=1):
+            if nm == "chunk10":
+                start_idx = i
+                break
+
+    if run_single:
+        steps_to_run = [steps_map[start_idx]]
+    else:
+        steps_to_run = steps[start_idx - 1 :]
+
     total_steps = len(steps_to_run)
 
     def run_step(name, func):
@@ -79,6 +117,95 @@ def main():
             flush=True,
         )
         return result
+
+    # Pre-flight check for single-chunk mode
+    if run_single:
+        data_dir = os.getenv("ML_DATA_DIR", "ml/data")
+        name, _ = steps_to_run[0]
+        def req(paths):
+            missing = []
+            print(f"Pre-flight for {name} (data_dir={data_dir}):", flush=True)
+            for p in paths:
+                full = p if os.path.isabs(p) else os.path.join(data_dir, p)
+                ok = os.path.exists(full)
+                print(f" - {'OK ' if ok else 'MISS'} {full}", flush=True)
+                if not ok:
+                    missing.append(full)
+            if missing:
+                raise SystemExit("Missing required artifacts for single-chunk run. See 'MISS' above.")
+
+        def print_structured_quantiles():
+            qpath = os.path.join(data_dir, "structured_quantiles.json")
+            if os.path.exists(qpath):
+                try:
+                    import json
+                    with open(qpath, "r", encoding="utf-8") as f:
+                        q = json.load(f)
+                    print("Structured thresholds:")
+                    phg = q.get('p_high_global')
+                    phm = q.get('p_high_by_metric', {})
+                    if phg is not None:
+                        print(f" - global_p_high={phg}")
+                    # Print only metrics that use winsorization (skip discount_percent)
+                    for key in [
+                        'positive_review_count',
+                        'negative_review_count',
+                        'price_usd',
+                    ]:
+                        if key in q:
+                            lo = q[key].get('low')
+                            hi = q[key].get('high')
+                            zeros = q[key].get('zeros')
+                            print(f" - {key}: low={lo} high={hi} zeros={zeros}")
+                    # Show per-metric p_high overrides (excluding discount_percent)
+                    if phm:
+                        cnt = phm.get('counts')
+                        prc = phm.get('price_usd')
+                        if cnt is not None:
+                            print(f" - counts_p_high={cnt}")
+                        if prc is not None:
+                            print(f" - price_p_high={prc}")
+                except Exception as e:
+                    print(f"[warn] Could not read structured_quantiles.json: {e}")
+
+        if name == "chunk2":
+            req(["games_df.pkl"])  # from chunk1
+            print_structured_quantiles()
+        elif name == "chunk3":
+            req(["games_df.pkl", "tag_id_map.json"])  # from chunk1
+            print_structured_quantiles()
+        elif name == "chunk4":
+            req(["games_df.pkl"])  # from chunk1
+            print_structured_quantiles()
+        elif name == "chunk5":
+            req([
+                "structured_raw.npy",      # from chunk2
+                "structured_app_ids.npy",  # from chunk2
+                "structured_min.npy",      # from chunk2
+                "structured_max.npy",      # from chunk2
+                "T_pca_norm.npy",          # from chunk3
+                "E_pca_all.npy",           # from chunk4
+                "tag_pca_app_ids.npy",     # from chunk3
+            ])
+            print_structured_quantiles()
+        elif name == "chunk6":
+            req([
+                "T_pca_norm.npy",          # from chunk3
+                "item_meta_embs.npy",      # from chunk5
+                "structured_app_ids.npy",  # from chunk2
+            ])
+            print_structured_quantiles()
+        elif name == "chunk10":
+            req([
+                "interactions_df.pkl",       # from chunk1
+                "app_id_to_meta_index.json", # from chunk5
+                "global_popular_games.json", # from chunk1
+                "item_meta_embs.npy",        # from chunk5
+                "T_pca_norm.npy",            # from chunk3
+                "structured_app_ids.npy",    # from chunk2
+                "global_tag_mean.npy",       # from chunk3
+            ])
+            print_structured_quantiles()
 
     for name, func in steps_to_run:
         run_step(name, func)

@@ -1,70 +1,80 @@
 import os
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA
+from sklearn.decomposition import TruncatedSVD
+from scipy import sparse
 from .utils import load_json, save_numpy, save_torch
 
 
-def run_tag_pca(games_df: pd.DataFrame) -> None:
+def run_tag_pca(games_df: pd.DataFrame, dim: int = 128, sppmi_shift: float = 5.0) -> None:
+    """Build game embeddings from a bipartite game–tag graph via SPPMI + SVD.
+
+    - Edge weight uses a rank-based weight w = (21 - rank) / 20 (same as before)
+    - SPPMI(g, t) = max(log p(g,t) - log p(g) - log p(t) - log(k), 0), k = sppmi_shift
+    - TruncatedSVD to fixed dim, then row L2-normalization
+    """
     tag_id_map = load_json('ml/data/tag_id_map.json')
     V = len(tag_id_map)
     N = len(games_df)
-    app_ids = []
 
-    # Compute document frequency for each tag
-    df_counts = np.zeros(V, dtype=int)
-    for tags in games_df['tags']:
-        if not tags:
-            continue
-        seen = set()
-        for tag_id, _ in tags:
-            key = str(tag_id)
-            if key in tag_id_map:
-                seen.add(tag_id_map[key])
-        for idx in seen:
-            df_counts[idx] += 1
+    app_ids = games_df['app_id'].astype(int).to_numpy()
 
-    # Smooth IDF as in sklearn: log((N + 1) / (df + 1)) + 1
-    idf = np.log((N + 1) / (df_counts + 1)) + 1.0
-
-    T_raw_all = np.zeros((N, V), dtype=float)
-
+    # Build sparse game–tag weight matrix W (CSR)
+    rows = []
+    cols = []
+    data = []
     for row_idx, row in games_df.iterrows():
-        tags = row['tags'] or []
+        tags = row.get('tags') or []
         for tag_id, rank in tags:
             key = str(tag_id)
-            if key not in tag_id_map:
-                # Skip tags that are missing from the tag_id_map
+            j = tag_id_map.get(key)
+            if j is None:
                 continue
-            idx = tag_id_map[key]
-            tf = (21 - rank) / 20.0
-            T_raw_all[row_idx, idx] = tf * idf[idx]
-        app_ids.append(row['app_id'])
+            w = (21 - int(rank)) / 20.0
+            if w <= 0:
+                continue
+            rows.append(row_idx)
+            cols.append(int(j))
+            data.append(float(w))
 
-    # 1. Fit full PCA to determine optimal k for 90% variance
-    pca_full = PCA()
-    pca_full.fit(T_raw_all)            # default n_components=None → all components
-    cumvar = np.cumsum(pca_full.explained_variance_ratio_)
-    k_opt = np.searchsorted(cumvar, 0.90) + 1
-    print(f"Optimal number of components to cover 90% variance: {k_opt}")
+    if not data:
+        raise RuntimeError('No tag edges found to build bipartite embeddings')
 
-    # 2. Re-fit PCA with optimal components
-    pca = PCA(n_components=k_opt)
-    T_pca = pca.fit_transform(T_raw_all)
-    cumsum = np.cumsum(pca.explained_variance_ratio_)
-    if cumsum[k_opt-1] < 0.90:
-        raise RuntimeError(f'Tag-PCA covers only {cumsum[k_opt-1]*100:.1f}% variance')
-    print(f'Tag-PCA covers {cumsum[k_opt-1]*100:.1f}% variance')
-    
-    norms = np.linalg.norm(T_pca, axis=1, keepdims=True)
-    norms[norms==0] = 1e-6
-    T_pca_norm = T_pca / norms
+    W = sparse.csr_matrix((data, (rows, cols)), shape=(N, V), dtype=np.float64)
+
+    # Compute SPPMI matrix on edges
+    total_mass = float(W.sum())
+    p_g = np.asarray(W.sum(axis=1)).flatten() / max(total_mass, 1e-12)
+    p_t = np.asarray(W.sum(axis=0)).flatten() / max(total_mass, 1e-12)
+    log_k = np.log(sppmi_shift)
+
+    # For each nonzero entry, compute SPPMI value
+    W = W.tocoo()
+    sppmi_vals = []
+    for i, j, w in zip(W.row, W.col, W.data):
+        p_gt = w / total_mass
+        if p_gt <= 0 or p_g[i] <= 0 or p_t[j] <= 0:
+            sppmi_vals.append(0.0)
+        else:
+            val = np.log(p_gt) - np.log(p_g[i]) - np.log(p_t[j]) - log_k
+            sppmi_vals.append(val if val > 0 else 0.0)
+    S = sparse.csr_matrix((sppmi_vals, (W.row, W.col)), shape=(N, V), dtype=np.float64)
+
+    # Truncated SVD to fixed dimensions
+    k = min(dim, min(N, V) - 1) if min(N, V) > 1 else 1
+    svd = TruncatedSVD(n_components=k, random_state=42)
+    G_emb = svd.fit_transform(S)
+
+    # Row L2-normalize
+    norms = np.linalg.norm(G_emb, axis=1, keepdims=True)
+    norms[norms == 0] = 1e-6
+    G_norm = (G_emb / norms).astype('float32')
 
     os.makedirs('ml/data', exist_ok=True)
-    save_numpy(T_pca_norm.astype('float32'), 'ml/data/T_pca_norm.npy')
-    save_torch(pca, 'ml/data/pca_tags.pkl')
-    save_numpy(np.array(app_ids), 'ml/data/tag_pca_app_ids.npy')
-    global_tag_mean = T_pca_norm.mean(axis=0)
+    save_numpy(G_norm, 'ml/data/T_pca_norm.npy')  # keep filename for downstream
+    save_torch(svd, 'ml/data/pca_tags.pkl')        # store SVD model for reproducibility
+    save_numpy(app_ids, 'ml/data/tag_pca_app_ids.npy')
+    global_tag_mean = G_norm.mean(axis=0)
     save_numpy(global_tag_mean, 'ml/data/global_tag_mean.npy')
-    print('✅ Chunk 3 tag PCA saved')
+    print(f'✅ Chunk 3 bipartite SPPMI+SVD saved (dim={k})')
 

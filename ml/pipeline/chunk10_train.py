@@ -25,7 +25,7 @@ def _split_by_user(df: pd.DataFrame) -> Dict[int, Dict[str, pd.DataFrame]]:
     splits = {}
     for uid, grp in df.groupby("user_id"):
         positives = grp[(grp["playtime_forever"] > 0) | (grp["playtime_2weeks"] > 0) | (grp["wishlisted"])]
-        if len(positives) < 20:
+        if len(positives) < 10:
             continue
         grp = grp.sample(frac=1, random_state=42)
         n = len(grp)
@@ -52,7 +52,11 @@ def _sample_negative(user_pos: List[int], global_popular: List[int]) -> int:
     return int(np.random.choice(candidates))
 
 
-def train_model(num_epochs: int = 1, batch_size: int = 256, data_dir: str | None = None) -> None:
+def train_model(
+    num_epochs: int | None = None,
+    batch_size: int = 256,
+    data_dir: str | None = None,
+) -> None:
     if data_dir is None:
         data_dir = os.getenv("ML_DATA_DIR", "ml/data")
     interactions = pd.read_pickle(os.path.join(data_dir, "interactions_df.pkl"))
@@ -73,11 +77,51 @@ def train_model(num_epochs: int = 1, batch_size: int = 256, data_dir: str | None
     params += list(user_meta_fc.parameters()) + list(score_mlp.parameters())
     optimizer = AdamW(params, lr=1e-4, weight_decay=1e-5)
     steps_per_epoch = ceil(len(user_ids) / batch_size)
-    scheduler = get_cosine_schedule_with_warmup(optimizer, steps_per_epoch, num_epochs * steps_per_epoch)
 
     item_meta_embs = load_numpy(os.path.join(data_dir, "item_meta_embs.npy"))
 
-    for epoch in range(num_epochs):
+    # Configure epoch schedule: fixed or adaptive and scheduler total steps
+    def _env_float(name: str, default: float) -> float:
+        try:
+            return float(os.getenv(name, str(default)))
+        except Exception:
+            return default
+    def _env_int(name: str, default: int) -> int:
+        try:
+            return int(os.getenv(name, str(default)))
+        except Exception:
+            return default
+
+    adaptive = num_epochs is None
+    min_epochs = _env_int("MIN_EPOCHS", 3)
+    max_epochs = _env_int("MAX_EPOCHS", 20)
+    patience = _env_int("PATIENCE_EPOCHS", 2)
+    rel_improve = _env_float("REL_IMPROVE", 0.01)  # 1% relative improvement
+
+    # Initialize scheduler with a safe upper bound on total steps
+    if num_epochs is None:
+        total_steps = max(1, steps_per_epoch * max_epochs)
+    else:
+        total_steps = max(1, steps_per_epoch * num_epochs)
+    scheduler = get_cosine_schedule_with_warmup(
+        optimizer,
+        steps_per_epoch,  # warmup for roughly 1 epoch
+        total_steps,
+    )
+
+    if adaptive:
+        print(
+            f"Adaptive training: min={min_epochs}, max={max_epochs}, "
+            f"patience={patience}, rel_improve={rel_improve}",
+            flush=True,
+        )
+    else:
+        print(f"Training for {num_epochs} epoch(s)")
+
+    best_loss = float("inf")
+    no_improve = 0
+    epoch = 0
+    while True:
         np.random.shuffle(user_ids)
         epoch_loss = 0.0
         for i in range(0, len(user_ids), batch_size):
@@ -120,7 +164,34 @@ def train_model(num_epochs: int = 1, batch_size: int = 256, data_dir: str | None
             scheduler.step()
             epoch_loss += loss_batch.item()
 
-        print(f"epoch {epoch} loss {epoch_loss/steps_per_epoch:.4f}")
+        avg_loss = epoch_loss/steps_per_epoch
+        total = num_epochs if not adaptive else (f"≤{max_epochs}")
+        print(f"epoch {epoch+1}/{total} loss {avg_loss:.4f}")
+
+        # Early stopping logic
+        improved = (best_loss - avg_loss) > (rel_improve * max(best_loss, 1e-8))
+        if improved:
+            best_loss = avg_loss
+            no_improve = 0
+        else:
+            no_improve += 1
+
+        epoch += 1
+        if not adaptive:
+            if epoch >= (num_epochs or 1):
+                break
+        else:
+            if epoch < min_epochs:
+                continue
+            if no_improve >= patience:
+                print(
+                    f"Early stopping after {epoch} epochs (no improvement for {patience} epoch(s))",
+                    flush=True,
+                )
+                break
+            if epoch >= max_epochs:
+                print(f"Reached max_epochs={max_epochs}", flush=True)
+                break
 
     tables.compute_means()
     tables.save(os.path.join(data_dir, "emb_tables"))
