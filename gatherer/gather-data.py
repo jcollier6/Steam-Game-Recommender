@@ -56,13 +56,6 @@ def strip_html(raw_html: str) -> str:
 
     return text.strip()
 
-
-def serialize_if_needed(value):
-    """Convert lists or dictionaries to JSON strings for database storage."""
-    if isinstance(value, (dict, list)):
-        return json.dumps(value, ensure_ascii=False)
-    return value
-
 def extract_supported_languages(raw: str | None) -> str | None:
     """Convert the Steam API's supported_languages string to JSON array."""
     if not raw:
@@ -245,6 +238,10 @@ def store_game_details_in_db(new_ids_only: bool):
 
         # Extract price overview
         price_overview = details.get("price_overview")
+        if isinstance(price_overview, (dict, list)):
+            price_overview = json.dumps(price_overview, ensure_ascii=False)
+        else:
+            price_overview = None
 
         release_date_info = details.get("release_date", {})
         coming_soon = 1 if release_date_info.get("coming_soon", False) else 0
@@ -278,8 +275,10 @@ def store_game_details_in_db(new_ids_only: bool):
         detailed_description_html = details.get("detailed_description", "")
         detailed_description = strip_html(detailed_description_html)
 
-        genres = details.get("genres")
-        categories = details.get("categories")
+        genres_data = details.get("genres")
+        genres = json.dumps(genres_data, ensure_ascii=False) if isinstance(genres_data, list) else None
+        categories_data = details.get("categories")
+        categories = json.dumps(categories_data, ensure_ascii=False) if isinstance(categories_data, list) else None
 
         supported_languages_raw = details.get("supported_languages")
         supported_languages = extract_supported_languages(supported_languages_raw)
@@ -290,7 +289,7 @@ def store_game_details_in_db(new_ids_only: bool):
         platforms_info = details.get("platforms", {})
         platforms = ",".join([platform for platform in ["windows", "mac", "linux"] if platforms_info.get(platform)])
 
-        raw_data_json = details
+        raw_data_json = json.dumps(details, ensure_ascii=False)
 
         upsert_sql = """
         INSERT INTO steam_game_details (
@@ -315,7 +314,6 @@ def store_game_details_in_db(new_ids_only: bool):
             short_description, detailed_description, genres, categories, supported_languages, developers, publishers, platforms,
             recommendations_count, raw_data_json, header_image, screenshot1, screenshot2, screenshot3, screenshot4
         )
-        vals = tuple(serialize_if_needed(v) for v in vals)
 
         try:
             cursor.execute(upsert_sql, vals)
