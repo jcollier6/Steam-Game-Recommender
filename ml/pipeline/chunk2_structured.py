@@ -10,8 +10,6 @@ from .utils import save_numpy, save_json
 
 
 CONT_COLS_ORDER = [
-    "log1p_pos",
-    "log1p_neg",
     "log1p_total",
     "pos_ratio",
     "wilson_score",
@@ -20,8 +18,6 @@ CONT_COLS_ORDER = [
 ]
 
 FINAL_COL_ORDER = [
-    "log1p_pos",
-    "log1p_neg",
     "log1p_total",
     "pos_ratio",
     "wilson_score",
@@ -133,8 +129,6 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
     pos = df['pos_reviews'].astype(float).to_numpy()
     neg = df['neg_reviews'].astype(float).to_numpy()
     total = pos + neg
-    log1p_pos = np.log1p(pos)
-    log1p_neg = np.log1p(neg)
     log1p_total = np.log1p(total)
     pos_ratio = pos / np.maximum(total, 1.0)
     wilson = _wilson_lower_bound(pos, total)
@@ -158,8 +152,6 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
     scaled = {}
     scaling: Dict[str, Dict[str, float]] = {}
     for name, arr in [
-        ("log1p_pos", log1p_pos),
-        ("log1p_neg", log1p_neg),
         ("log1p_total", log1p_total),
         ("pos_ratio", pos_ratio),
         ("wilson_score", wilson),
@@ -173,8 +165,6 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
 
     # Assemble final matrix in frozen order
     cols: List[np.ndarray] = [
-        scaled["log1p_pos"],
-        scaled["log1p_neg"],
         scaled["log1p_total"],
         scaled["pos_ratio"],
         scaled["wilson_score"],
