@@ -1,12 +1,10 @@
 import os
 import time
 from typing import List
-
 import numpy as np
 import pandas as pd
 import torch
 from transformers import AutoModel, AutoTokenizer
-
 from .utils import save_numpy
 
 
