@@ -280,8 +280,10 @@ def store_game_details_in_db(new_ids_only: bool):
         detailed_description_html = details.get("detailed_description", "")
         detailed_description = strip_html(detailed_description_html)
 
-        genres = ", ".join([g.get("description", "") for g in details.get("genres", []) if g.get("description")])
-        categories = ", ".join([c.get("description", "") for c in details.get("categories", []) if c.get("description")])
+        genres_list = details.get("genres", [])
+        genres = json.dumps(genres_list, ensure_ascii=False) if genres_list else None
+        categories_list = details.get("categories", [])
+        categories = json.dumps(categories_list, ensure_ascii=False) if categories_list else None
 
         supported_languages_raw = details.get("supported_languages")
         supported_languages = extract_supported_languages(supported_languages_raw)
