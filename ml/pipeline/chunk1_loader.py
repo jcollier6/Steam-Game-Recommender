@@ -44,6 +44,8 @@ def load_games_table(connection) -> pd.DataFrame:
             g.fetched_at AS snapshot_date,
             g.short_description,
             g.detailed_description AS long_description,
+            g.genres,
+            g.categories,
 
             GROUP_CONCAT(CONCAT(ts.tag_id, ':', gt.tag_rank) ORDER BY gt.tag_rank SEPARATOR ',') AS tags_with_ranks
 
@@ -110,6 +112,23 @@ def load_games_table(connection) -> pd.DataFrame:
         return pairs
 
     df['tags'] = df['tags_with_ranks'].apply(parse_tag_ranks)
+    def _parse_id_list(s: str) -> List[int]:
+        if not s:
+            return []
+        try:
+            items = json.loads(s)
+        except json.JSONDecodeError:
+            return []
+        ids: List[int] = []
+        for item in items:
+            try:
+                ids.append(int(item.get('id')))
+            except (TypeError, ValueError, AttributeError):
+                continue
+        return ids
+
+    df['genres'] = df['genres'].fillna('').astype(str).apply(_parse_id_list)
+    df['categories'] = df['categories'].fillna('').astype(str).apply(_parse_id_list)
     return df
 
 

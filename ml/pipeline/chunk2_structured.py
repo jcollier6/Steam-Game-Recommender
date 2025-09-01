@@ -5,6 +5,7 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import MultiLabelBinarizer
 
 from .utils import save_numpy, save_json
 
@@ -17,7 +18,7 @@ CONT_COLS_ORDER = [
     # but their names already include "_scaled" as required.
 ]
 
-FINAL_COL_ORDER = [
+BASE_FINAL_COL_ORDER = [
     "log1p_total",
     "pos_ratio",
     "wilson_score",
@@ -164,7 +165,12 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
         scaling[name] = {"min": float(vmin), "max": float(vmax)}
 
     # Assemble final matrix in frozen order
-    cols: List[np.ndarray] = [
+    mlb_genres = MultiLabelBinarizer()
+    mlb_categories = MultiLabelBinarizer()
+    genres_ohe = mlb_genres.fit_transform(df['genres'])
+    categories_ohe = mlb_categories.fit_transform(df['categories'])
+
+    base_cols: List[np.ndarray] = [
         scaled["log1p_total"],
         scaled["pos_ratio"],
         scaled["wilson_score"],
@@ -180,7 +186,15 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
         age_onehot[:, 6].astype(np.float32),
         age_onehot[:, 7].astype(np.float32),
     ]
-    X = np.stack(cols, axis=1).astype(np.float32)
+    X = np.stack(base_cols, axis=1).astype(np.float32)
+    if genres_ohe.shape[1] > 0:
+        X = np.concatenate([X, genres_ohe.astype(np.float32)], axis=1)
+    if categories_ohe.shape[1] > 0:
+        X = np.concatenate([X, categories_ohe.astype(np.float32)], axis=1)
+
+    genre_cols = [f"genre_{g}" for g in mlb_genres.classes_]
+    category_cols = [f"category_{c}" for c in mlb_categories.classes_]
+    final_col_order = BASE_FINAL_COL_ORDER + genre_cols + category_cols
 
     # Deterministic train/val split for diagnostics
     rng = np.random.default_rng(42)
@@ -192,10 +206,9 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
     # Per-feature stats and histograms (after scaling)
     print("Per-feature min/max and 10-bin hist (scaled):")
     edges01 = np.linspace(0.0, 1.0, 11)
-    for j, name in enumerate(FINAL_COL_ORDER):
+    for j, name in enumerate(final_col_order):
         col = X[:, j]
-        if name in ("is_free", "age_0_7", "age_7_30", "age_30_90", "age_90_180",
-                    "age_180_365", "age_365_730", "age_730_1825", "age_1825_plus"):
+        if name == "is_free" or name.startswith("age_") or name.startswith("genre_") or name.startswith("category_"):
             unique, counts = np.unique(col, return_counts=True)
             print(f"- {name}: binary/one-hot counts {dict(zip(unique.astype(int), counts.tolist()))}")
         else:
@@ -205,25 +218,23 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
 
     # PSI drift check (train->val) on continuous scaled columns
     print("PSI train→val (warn if > 0.2):")
-    for name in FINAL_COL_ORDER:
-        if name in ("is_free", "age_0_7", "age_7_30", "age_30_90", "age_90_180",
-                    "age_180_365", "age_365_730", "age_730_1825", "age_1825_plus"):
+    for name in final_col_order:
+        if name == "is_free" or name.startswith("age_") or name.startswith("genre_") or name.startswith("category_"):
             continue
-        j = FINAL_COL_ORDER.index(name)
+        j = final_col_order.index(name)
         psi = _psi(X[tr_idx, j], X[va_idx, j], bins=10)
         flag = " [WARN]" if psi > 0.2 else ""
         print(f"- {name}: PSI={psi:.3f}{flag}")
 
     # Popularity dominance guard: corr(log1p_total, others)
-    j_total = FINAL_COL_ORDER.index("log1p_total")
+    j_total = final_col_order.index("log1p_total")
     ref = X[:, j_total]
     print("Correlation |r| with log1p_total (flag if > 0.9):")
-    for name in FINAL_COL_ORDER:
+    for name in final_col_order:
         if name == "log1p_total":
             continue
-        j = FINAL_COL_ORDER.index(name)
-        if name in ("is_free", "age_0_7", "age_7_30", "age_30_90", "age_90_180",
-                    "age_180_365", "age_365_730", "age_730_1825", "age_1825_plus"):
+        j = final_col_order.index(name)
+        if name == "is_free" or name.startswith("age_") or name.startswith("genre_") or name.startswith("category_"):
             continue
         col = X[:, j]
         r = float(np.corrcoef(ref, col)[0, 1]) if np.std(col) > 0 and np.std(ref) > 0 else 0.0
@@ -238,8 +249,10 @@ def structured_transform(games_df: pd.DataFrame, today: datetime) -> None:
     save_json(appid_to_rowidx, 'ml/data/appid_to_rowidx.json')
 
     schema = {
-        "columns": FINAL_COL_ORDER,
+        "columns": final_col_order,
         "scaling": scaling,
+        "genre_labels": mlb_genres.classes_.tolist(),
+        "category_labels": mlb_categories.classes_.tolist(),
         "snapshot_date": str(pd.to_datetime(df['snapshot_date'].max()).normalize().date()),
     }
     save_json(schema, 'ml/data/structured_schema.json')
