@@ -10,7 +10,7 @@ from . import (
     chunk1_loader,
     chunk2_structured,
     chunk3_tags_pca,
-    chunk4_text_pca,
+    chunk4_text_embeddings,
     chunk5_item_meta,
     chunk6_faiss,
     chunk10_train,
@@ -67,7 +67,7 @@ def main():
             ),
         ),
         ("chunk3", lambda: chunk3_tags_pca.run_tag_pca(load_games_df())),
-        ("chunk4", lambda: chunk4_text_pca.run_text_pca(load_games_df())),
+        ("chunk4", lambda: chunk4_text_embeddings.run_text_embeddings(load_games_df())),
         ("chunk5", chunk5_item_meta.run_item_meta_embedding),
         ("chunk6", chunk6_faiss.build_faiss_indices),
         ("chunk10", lambda: chunk10_train.train_model(num_epochs=epochs)),
@@ -184,7 +184,7 @@ def main():
                 "structured_min.npy",      # from chunk2
                 "structured_max.npy",      # from chunk2
                 "T_pca_norm.npy",          # from chunk3
-                "E_pca_all.npy",           # from chunk4
+                "E_qwen3.npy",            # from chunk4
                 "tag_pca_app_ids.npy",     # from chunk3
             ])
             print_structured_quantiles()

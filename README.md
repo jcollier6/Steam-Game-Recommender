@@ -26,7 +26,15 @@ This repository now includes a new modular pipeline under `ml/pipeline` implemen
    top most played games from the Steam Charts API.
 2. `chunk2_structured` – computes structured numeric features.
 3. `chunk3_tags_pca` – builds tag vectors and PCA embeddings.
-4. `chunk4_text_pca` – generates BERT embeddings and applies PCA.
+4. `chunk4_text_embeddings` – computes Qwen3 embeddings for short and long descriptions
+   and stores the combined vectors in `ml/data/E_qwen3.npy`. The embeddings are
+   calculated separately for `short_description` (truncated to 96 tokens) and
+   `long_description` (truncated to 1,024 tokens) and combined as
+   `0.4 * short + 0.6 * long` by default; the weights can be adjusted via
+   function arguments. The chunk batches requests with a default batch size of
+   256, requires FlashAttention‑2 in float16, and logs progress every 20 batches
+   with token‑throughput statistics; both `batch_size` and logging frequency are
+   configurable.
 5. `chunk5_item_meta` – combines all features into 128‑dim item embeddings.
 6. `chunk6_faiss` – builds FAISS indices for fast retrieval.
 

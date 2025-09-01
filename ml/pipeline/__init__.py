@@ -11,7 +11,7 @@ from . import utils
 from . import chunk1_loader
 from . import chunk2_structured
 from . import chunk3_tags_pca
-from . import chunk4_text_pca
+from . import chunk4_text_embeddings
 from . import chunk5_item_meta
 from . import chunk6_faiss
 from . import chunk7_user_profile
@@ -25,7 +25,7 @@ __all__ = [
     "chunk1_loader",
     "chunk2_structured",
     "chunk3_tags_pca",
-    "chunk4_text_pca",
+    "chunk4_text_embeddings",
     "chunk5_item_meta",
     "chunk6_faiss",
     "chunk7_user_profile",
