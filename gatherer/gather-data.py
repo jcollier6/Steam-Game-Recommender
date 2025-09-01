@@ -11,6 +11,7 @@ import logging
 import sys
 import re
 import os
+import emoji
 
 
 # --- Validate required environment variables ---
@@ -38,11 +39,22 @@ tag_upserts: list[tuple[int, str, int]] = []
 # holds all reviews for batch upserts
 review_upserts: list[tuple[int,int,int,int]] = []
 
-# Utility to remove HTML tags from Steam API fields
+# Utility to clean HTML, bullet characters, and emojis from Steam API fields
 def strip_html(raw_html: str) -> str:
+    """Remove HTML, emoji and bullet characters from a string."""
     if not raw_html:
         return ""
-    return BeautifulSoup(raw_html, "html.parser").get_text(" ", strip=True)
+
+    text = BeautifulSoup(raw_html, "html.parser").get_text(" ", strip=True)
+
+    # Remove common bullet characters and markers at line starts
+    text = re.sub(r"^[\s]*[-\*•·▪◦►]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"[•·▪◦►]", "", text)
+
+    # Strip emoji characters using the emoji library
+    text = emoji.replace_emoji(text, "")
+
+    return text.strip()
 
 
 def serialize_if_needed(value):
