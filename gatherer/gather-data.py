@@ -21,11 +21,16 @@ for var in required_vars:
         raise EnvironmentError(f"Missing required environment variable: {var}")
     
 # ---- MySQL CONNECTION ----
+# MySQL tends to default to ``latin1`` which can corrupt extended
+# characters when writing descriptions.  Force ``utf8mb4`` so text
+# scraped from Steam is stored losslessly.
 conn = mysql.connector.connect(
     host=os.environ["MYSQL_HOST"],
     user=os.environ["MYSQL_USER"],
     passwd=os.environ["MYSQL_PASSWORD"],
-    database=os.environ["MYSQL_DATABASE"]
+    database=os.environ["MYSQL_DATABASE"],
+    charset="utf8mb4",
+    use_unicode=True,
 )
 cursor = conn.cursor()
 
