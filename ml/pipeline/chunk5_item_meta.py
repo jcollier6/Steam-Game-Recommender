@@ -81,15 +81,29 @@ def run_item_meta_embedding() -> None:
     # X_structured is already scaled; concatenate directly with tag PCs and text embeddings
     item_meta_raw = np.concatenate([structured, T_pca_norm, E_qwen3], axis=1)
     print(f"item_meta_raw shape: {item_meta_raw.shape}")
+    norms = np.linalg.norm(item_meta_raw, axis=1, keepdims=True)
+    norms[norms == 0] = 1e-8
+    item_meta_raw = item_meta_raw / norms
+    print(
+        f"Sample post-normalization norm: {np.linalg.norm(item_meta_raw[0]):.4f}"
+    )
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = ItemMetaFC(item_meta_raw.shape[1]).to(device)
     model.eval()
+    batch_size = 20000
+    total_batches = (len(item_meta_raw) + batch_size - 1) // batch_size
+    emb_chunks = []
     with torch.no_grad():
-        x = torch.from_numpy(item_meta_raw).float().to(device)
-        embs = model(x)
+        for i in range(total_batches):
+            start = i * batch_size
+            end = min(start + batch_size, len(item_meta_raw))
+            batch = torch.from_numpy(item_meta_raw[start:end]).float().to(device)
+            emb_chunks.append(model(batch).cpu())
+            print(f"Processed batch {i+1}/{total_batches}")
+    embs = torch.cat(emb_chunks, dim=0)
     print(f"ItemMetaFC output shape: {embs.shape}")
-    embs_np = embs.cpu().numpy().astype('float32')
+    embs_np = embs.numpy().astype('float32')
     os.makedirs('ml/data', exist_ok=True)
     save_numpy(embs_np, 'ml/data/item_meta_embs.npy')
     save_torch(model.state_dict(), 'ml/data/item_meta_fc.pth')
