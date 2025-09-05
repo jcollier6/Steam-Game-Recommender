@@ -114,10 +114,10 @@ def train_model(
             return default
 
     adaptive = num_epochs is None
-    min_epochs = _env_int("MIN_EPOCHS", 3)
+    min_epochs = _env_int("MIN_EPOCHS", 5)
     max_epochs = _env_int("MAX_EPOCHS", 20)
     patience = _env_int("PATIENCE_EPOCHS", 2)
-    rel_improve = _env_float("REL_IMPROVE", 0.01)  # 1% relative improvement
+    rel_improve = _env_float("REL_IMPROVE", 0.005)  # 0.5% relative improvement
 
     # Initialize scheduler with a safe upper bound on total steps
     if num_epochs is None:
@@ -129,6 +129,72 @@ def train_model(
         steps_per_epoch,  # warmup for roughly 1 epoch
         total_steps,
     )
+
+    def validate() -> Tuple[float, float, float]:
+        pair_correct = 0
+        pair_total = 0
+        hit_count = 0
+        ndcg_sum = 0.0
+        users_evaluated = 0
+        for uid in user_ids:
+            val_df = splits[uid]["val"]
+            if val_df.empty:
+                continue
+            pos_mask = (
+                (val_df["playtime_forever"] > 0)
+                | (val_df["playtime_2weeks"] > 0)
+                | (val_df["wishlisted"])
+            )
+            if pos_mask.sum() == 0 or pos_mask.sum() == len(val_df):
+                continue
+            u_idx = user_id_map[uid]
+            with torch.no_grad():
+                u_emb = tables.user_emb(
+                    torch.tensor([u_idx], dtype=torch.long, device=device)
+                )
+                user_meta = user_meta_tensor[u_idx].unsqueeze(0)
+                user_meta_emb = user_meta_fc(user_meta)
+                scores: List[float] = []
+                labels: List[int] = []
+                for _, row in val_df.iterrows():
+                    app = int(row["app_id"])
+                    idx = app_id_to_index.get(str(app), 0)
+                    item_emb = tables.item_emb(
+                        torch.tensor([idx], dtype=torch.long, device=device)
+                    )
+                    item_meta = item_meta_embs[idx].unsqueeze(0)
+                    x = torch.cat([u_emb, user_meta_emb, item_emb, item_meta], dim=1)
+                    scores.append(score_mlp(x).item())
+                    label = int(
+                        (row["playtime_forever"] > 0)
+                        or (row["playtime_2weeks"] > 0)
+                        or row["wishlisted"]
+                    )
+                    labels.append(label)
+                scores_np = np.array(scores)
+                labels_np = np.array(labels)
+                pos_scores = scores_np[labels_np == 1]
+                neg_scores = scores_np[labels_np == 0]
+                if len(pos_scores) == 0 or len(neg_scores) == 0:
+                    continue
+                pair_correct += (pos_scores[:, None] > neg_scores[None, :]).sum()
+                pair_total += len(pos_scores) * len(neg_scores)
+                ranking = np.argsort(-scores_np)
+                topk = labels_np[ranking][:10]
+                hit_count += 1 if topk.max() == 1 else 0
+                gains = (2 ** topk - 1) / np.log2(np.arange(1, len(topk) + 1) + 1)
+                dcg = gains.sum()
+                ideal = np.sort(labels_np)[::-1][:10]
+                ideal_gains = (2 ** ideal - 1) / np.log2(
+                    np.arange(1, len(ideal) + 1) + 1
+                )
+                idcg = ideal_gains.sum() if ideal_gains.sum() > 0 else 1.0
+                ndcg_sum += dcg / idcg
+                users_evaluated += 1
+        pair_acc = pair_correct / pair_total if pair_total else float("nan")
+        hit10 = hit_count / users_evaluated if users_evaluated else float("nan")
+        ndcg10 = ndcg_sum / users_evaluated if users_evaluated else float("nan")
+        return pair_acc, hit10, ndcg10
 
     if adaptive:
         print(
@@ -193,8 +259,12 @@ def train_model(
             epoch_loss += loss_batch.item()
 
         avg_loss = epoch_loss/steps_per_epoch
+        pair_acc, hit10, ndcg10 = validate()
         total = num_epochs if not adaptive else (f"≤{max_epochs}")
-        print(f"epoch {epoch+1}/{total} loss {avg_loss:.4f}")
+        print(
+            f"epoch {epoch+1}/{total} loss {avg_loss:.4f} "
+            f"pair_acc {pair_acc:.4f} hit10 {hit10:.4f} ndcg10 {ndcg10:.4f}"
+        )
 
         # Early stopping logic
         if best_loss == float("inf") or (
