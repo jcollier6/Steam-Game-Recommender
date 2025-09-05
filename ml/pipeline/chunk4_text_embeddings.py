@@ -1,6 +1,7 @@
 import os
 import time
 from typing import List
+import contextlib
 import numpy as np
 import pandas as pd
 import torch
@@ -14,6 +15,7 @@ def embed_texts(
     device: str = "cpu",
     short_max_length: int = 96,
     long_max_length: int = 1024,
+    batch_size: int = 8,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Compute short and long text embeddings using Qwen3 with batching and logs."""
 
@@ -79,7 +81,6 @@ def embed_texts(
         )
         return toks_short, toks_long
 
-    batch_size = 64
     loader = DataLoader(
         dataset,
         batch_size=batch_size,
@@ -94,7 +95,13 @@ def embed_texts(
     log_every = 80
     start_total = time.time()
 
-    with torch.inference_mode(), torch.autocast(device_type="cuda", dtype=torch.float16):
+    autocast_ctx = (
+        torch.autocast(device_type="cuda", dtype=torch.float16)
+        if device.startswith("cuda")
+        else contextlib.nullcontext()
+    )
+    with torch.inference_mode(), autocast_ctx:
+
         for batch_idx, (toks_short, toks_long) in enumerate(loader, 1):
             batch_start = time.time()
 
@@ -106,6 +113,7 @@ def embed_texts(
             num_tokens_short = int(toks_short["attention_mask"].sum().item())
             del out_short, emb_short, mask_s, toks_short
             if device.startswith("cuda"):
+                torch.cuda.synchronize()
                 torch.cuda.empty_cache()
 
             toks_long = {k: v.contiguous().to(device, non_blocking=True) for k, v in toks_long.items()}
@@ -116,6 +124,7 @@ def embed_texts(
             num_tokens_long = int(toks_long["attention_mask"].sum().item())
             del out_long, emb_long, mask_l, toks_long
             if device.startswith("cuda"):
+                torch.cuda.synchronize()
                 torch.cuda.empty_cache()
 
             batch_time = time.time() - batch_start
@@ -142,6 +151,7 @@ def run_text_embeddings(
     games_df: pd.DataFrame,
     short_max_length: int = 96,
     long_max_length: int = 1024,
+    batch_size: int = 8,
 ) -> None:
     """Generate and store separate Qwen3 text embeddings."""
 
@@ -151,6 +161,7 @@ def run_text_embeddings(
         device,
         short_max_length=short_max_length,
         long_max_length=long_max_length,
+        batch_size=batch_size,
     )
 
     os.makedirs("ml/data", exist_ok=True)
