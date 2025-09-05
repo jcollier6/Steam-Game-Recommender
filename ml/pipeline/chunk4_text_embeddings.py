@@ -11,40 +11,39 @@ from .utils import save_numpy
 def embed_texts(
     games_df: pd.DataFrame,
     device: str = "cpu",
-    short_weight: float = 0.4,
-    long_weight: float = 0.6,
     batch_size: int = 256,
     log_every: int = 20,
     short_max_length: int = 96,
     long_max_length: int = 1024,
-) -> np.ndarray:
-    """Compute weighted text embeddings using Qwen3 with batching and logs."""
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute short and long text embeddings using Qwen3 with batching and logs."""
 
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "true")
 
     model_id = "Qwen/Qwen3-Embedding-4B"
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
-    try:
-        model = AutoModel.from_pretrained(
-            model_id,
-            trust_remote_code=True,
-            torch_dtype=torch.float16 if device.startswith("cuda") else torch.float32,
-            attn_implementation="flash_attention_2",
-        ).to(device)
-    except Exception as exc:
-        raise RuntimeError(
-            "FlashAttention-2 is required for efficient embedding; install the flash-attn package"
-        ) from exc
+    model = AutoModel.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+        torch_dtype=torch.float16 if device.startswith("cuda") else torch.float32,
+        attn_implementation="sdpa",
+    ).to(device)
     model.eval()
+    if device.startswith("cuda"):
+        torch.backends.cuda.enable_flash_sdp(True)
+        torch.backends.cuda.enable_mem_efficient_sdp(True)
+        torch.backends.cuda.enable_math_sdp(True)
+        torch.set_float32_matmul_precision("high")
 
     short_texts: List[str] = (games_df["short_description"].fillna("").tolist())
     long_texts: List[str] = (games_df["long_description"].fillna("").tolist())
 
-    embeddings: List[np.ndarray] = []
+    embeddings_short: List[np.ndarray] = []
+    embeddings_long: List[np.ndarray] = []
     total_tokens = 0
     start_total = time.time()
 
-    with torch.no_grad():
+    with torch.inference_mode(), torch.autocast(device_type="cuda", dtype=torch.float16):
         for i in range(0, len(games_df), batch_size):
             batch_short = short_texts[i : i + batch_size]
             batch_long = long_texts[i : i + batch_size]
@@ -54,30 +53,35 @@ def embed_texts(
                 return_tensors="pt",
                 truncation=True,
                 padding=True,
+                pad_to_multiple_of=8,
                 max_length=short_max_length,
-            ).to(device)
+            )
             toks_long = tokenizer(
                 batch_long,
                 return_tensors="pt",
                 truncation=True,
                 padding=True,
+                pad_to_multiple_of=8,
                 max_length=long_max_length,
-            ).to(device)
+            )
+            toks_short = {k: v.contiguous().to(device, non_blocking=True) for k, v in toks_short.items()}
+            toks_long = {k: v.contiguous().to(device, non_blocking=True) for k, v in toks_long.items()}
 
             batch_start = time.time()
-            emb_short = model(**toks_short).last_hidden_state.mean(dim=1)
-            emb_long = model(**toks_long).last_hidden_state.mean(dim=1)
-            combined = short_weight * emb_short + long_weight * emb_long
+            out_short = model(**toks_short)
+            out_long = model(**toks_long)
+            mask_s = toks_short["attention_mask"].unsqueeze(-1)
+            emb_short = (out_short.last_hidden_state * mask_s).sum(dim=1) / mask_s.sum(dim=1).clamp(min=1)
+            mask_l = toks_long["attention_mask"].unsqueeze(-1)
+            emb_long = (out_long.last_hidden_state * mask_l).sum(dim=1) / mask_l.sum(dim=1).clamp(min=1)
             batch_time = time.time() - batch_start
 
-            num_tokens = int(toks_short.attention_mask.sum().item() + toks_long.attention_mask.sum().item())
+            num_tokens = int(toks_short["attention_mask"].sum().item() + toks_long["attention_mask"].sum().item())
             total_tokens += num_tokens
-            if batch_time > 0:
-                tok_per_sec = num_tokens / batch_time
-            else:
-                tok_per_sec = float("inf")
+            tok_per_sec = num_tokens / batch_time if batch_time > 0 else float("inf")
 
-            embeddings.append(combined.cpu().numpy())
+            embeddings_short.append(emb_short.float().cpu().numpy())
+            embeddings_long.append(emb_long.float().cpu().numpy())
 
             batch_idx = i // batch_size + 1
             if batch_idx % log_every == 0 or batch_idx == 1:
@@ -85,33 +89,29 @@ def embed_texts(
                 remaining = len(games_df) - processed
                 print(
                     f"Batch {batch_idx}: processed {processed}/{len(games_df)} rows, "
-                    f"{remaining} remaining at {tok_per_sec:.0f} tok/s"
+                    f"{remaining} remaining at {tok_per_sec:.0f} tok/s",
                 )
 
     total_time = time.time() - start_total
     if total_time > 0:
         print(f"Total throughput: {total_tokens / total_time:.0f} tok/s over {total_time:.1f}s")
 
-    return np.concatenate(embeddings, axis=0)
+    return np.concatenate(embeddings_short, axis=0), np.concatenate(embeddings_long, axis=0)
 
 
 def run_text_embeddings(
     games_df: pd.DataFrame,
-    short_weight: float = 0.4,
-    long_weight: float = 0.6,
     batch_size: int = 256,
     log_every: int = 20,
     short_max_length: int = 96,
     long_max_length: int = 1024,
 ) -> None:
-    """Generate and store Qwen3 text embeddings."""
+    """Generate and store separate Qwen3 text embeddings."""
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    E_qwen3 = embed_texts(
+    E_short, E_long = embed_texts(
         games_df,
         device,
-        short_weight,
-        long_weight,
         batch_size=batch_size,
         log_every=log_every,
         short_max_length=short_max_length,
@@ -119,6 +119,7 @@ def run_text_embeddings(
     )
 
     os.makedirs("ml/data", exist_ok=True)
-    save_numpy(E_qwen3.astype("float32"), "ml/data/E_qwen3.npy")
+    save_numpy(E_short.astype("float32"), "ml/data/E_qwen3_short.npy")
+    save_numpy(E_long.astype("float32"), "ml/data/E_qwen3_long.npy")
     print("✅ Chunk 4 Qwen3 embeddings saved")
 

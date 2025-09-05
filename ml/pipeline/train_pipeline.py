@@ -184,7 +184,8 @@ def main():
                 "structured_min.npy",      # from chunk2
                 "structured_max.npy",      # from chunk2
                 "T_pca_norm.npy",          # from chunk3
-                "E_qwen3.npy",            # from chunk4
+                "E_qwen3_short.npy",      # from chunk4
+                "E_qwen3_long.npy",       # from chunk4
                 "tag_pca_app_ids.npy",     # from chunk3
             ])
             print_structured_quantiles()
