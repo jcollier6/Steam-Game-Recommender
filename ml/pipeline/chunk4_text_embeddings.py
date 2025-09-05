@@ -101,6 +101,7 @@ def embed_texts(
         else contextlib.nullcontext()
     )
     with torch.inference_mode(), autocast_ctx:
+
         for batch_idx, (toks_short, toks_long) in enumerate(loader, 1):
             batch_start = time.time()
 
