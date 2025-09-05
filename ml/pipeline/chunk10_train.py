@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.optim import AdamW
+from torch.nn.utils import clip_grad_norm_
 from transformers import get_cosine_schedule_with_warmup
 
 from .chunk8_embeddings import EmbeddingTables
@@ -57,6 +58,12 @@ def train_model(
     batch_size: int = 256,
     data_dir: str | None = None,
 ) -> None:
+    """Train embedding models with pairwise ranking.
+
+    The function precomputes item and user metadata, supports optional
+    adaptive early stopping and runs on CPU or GPU depending on availability.
+    """
+
     if data_dir is None:
         data_dir = os.getenv("ML_DATA_DIR", "ml/data")
     interactions = pd.read_pickle(os.path.join(data_dir, "interactions_df.pkl"))
@@ -67,18 +74,32 @@ def train_model(
     app_id_to_index = load_json(os.path.join(data_dir, "app_id_to_meta_index.json"))
     global_popular = load_json(os.path.join(data_dir, "global_popular_games.json"))
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     tag_dim = load_numpy(os.path.join(data_dir, "T_pca_norm.npy")).shape[1]
 
     tables = EmbeddingTables(len(user_ids), len(app_id_to_index))
-    user_meta_fc = UserMetaFC(tag_dim + 1)
-    score_mlp = ScoreMLP()
+    tables.user_emb = tables.user_emb.to(device)
+    tables.item_emb = tables.item_emb.to(device)
+    user_meta_fc = UserMetaFC(tag_dim + 1).to(device)
+    score_mlp = ScoreMLP().to(device)
 
     params = list(tables.user_emb.parameters()) + list(tables.item_emb.parameters())
     params += list(user_meta_fc.parameters()) + list(score_mlp.parameters())
     optimizer = AdamW(params, lr=1e-4, weight_decay=1e-5)
     steps_per_epoch = ceil(len(user_ids) / batch_size)
 
-    item_meta_embs = load_numpy(os.path.join(data_dir, "item_meta_embs.npy"))
+    item_meta_embs = torch.from_numpy(
+        load_numpy(os.path.join(data_dir, "item_meta_embs.npy"))
+    ).float().to(device)
+
+    user_meta_list: List[np.ndarray] = []
+    for uid in user_ids:
+        _, _, meta_raw = compute_user_meta_raw(uid, interactions, data_dir)
+        user_meta_list.append(meta_raw)
+    user_meta_tensor = torch.tensor(
+        np.vstack(user_meta_list), dtype=torch.float32, device=device
+    )
 
     # Configure epoch schedule: fixed or adaptive and scheduler total steps
     def _env_float(name: str, default: float) -> float:
@@ -141,15 +162,21 @@ def train_model(
                 pos_idx = app_id_to_index.get(str(pos), 0)
                 neg_idx = app_id_to_index.get(str(neg), 0)
 
-                u_emb = tables.user_emb(torch.tensor([u_idx]))
-                pos_emb = tables.item_emb(torch.tensor([pos_idx]))
-                neg_emb = tables.item_emb(torch.tensor([neg_idx]))
+                u_emb = tables.user_emb(
+                    torch.tensor([u_idx], dtype=torch.long, device=device)
+                )
+                pos_emb = tables.item_emb(
+                    torch.tensor([pos_idx], dtype=torch.long, device=device)
+                )
+                neg_emb = tables.item_emb(
+                    torch.tensor([neg_idx], dtype=torch.long, device=device)
+                )
 
-                _, _, meta_raw = compute_user_meta_raw(u, interactions, data_dir)
-                user_meta_emb = user_meta_fc(torch.tensor(meta_raw).float().unsqueeze(0))
+                user_meta = user_meta_tensor[u_idx].unsqueeze(0)
+                user_meta_emb = user_meta_fc(user_meta)
 
-                pos_meta = torch.from_numpy(item_meta_embs[pos_idx]).float().unsqueeze(0)
-                neg_meta = torch.from_numpy(item_meta_embs[neg_idx]).float().unsqueeze(0)
+                pos_meta = item_meta_embs[pos_idx].unsqueeze(0)
+                neg_meta = item_meta_embs[neg_idx].unsqueeze(0)
 
                 x_pos = torch.cat([u_emb, user_meta_emb, pos_emb, pos_meta], dim=1)
                 x_neg = torch.cat([u_emb, user_meta_emb, neg_emb, neg_meta], dim=1)
@@ -160,6 +187,7 @@ def train_model(
                 losses.append(loss)
             loss_batch = torch.stack(losses).mean()
             loss_batch.backward()
+            clip_grad_norm_(params, max_norm=5.0)
             optimizer.step()
             scheduler.step()
             epoch_loss += loss_batch.item()
@@ -169,8 +197,9 @@ def train_model(
         print(f"epoch {epoch+1}/{total} loss {avg_loss:.4f}")
 
         # Early stopping logic
-        improved = (best_loss - avg_loss) > (rel_improve * max(best_loss, 1e-8))
-        if improved:
+        if best_loss == float("inf") or (
+            (best_loss - avg_loss) > rel_improve * max(best_loss, 1e-8)
+        ):
             best_loss = avg_loss
             no_improve = 0
         else:
@@ -197,7 +226,3 @@ def train_model(
     tables.save(os.path.join(data_dir, "emb_tables"))
     save_checkpoint(user_meta_fc.state_dict(), os.path.join(data_dir, "user_meta_fc.pth"))
     save_checkpoint(score_mlp.state_dict(), os.path.join(data_dir, "score_mlp.pth"))
-
-
-if __name__ == "__main__":
-    train_model(num_epochs=1)
