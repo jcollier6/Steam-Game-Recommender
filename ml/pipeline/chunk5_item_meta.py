@@ -38,8 +38,11 @@ def run_item_meta_embedding() -> None:
 
     # Load tag/text embeddings and their app_id arrays
     T_pca_norm = load_numpy('ml/data/T_pca_norm.npy')
-    E_qwen3 = load_numpy('ml/data/E_qwen3.npy')
-    print(f"E_qwen3 loaded with shape {E_qwen3.shape} and dtype {E_qwen3.dtype}")
+    E_short = load_numpy('ml/data/E_qwen3_short.npy')
+    E_long = load_numpy('ml/data/E_qwen3_long.npy')
+    print(f"E_short loaded with shape {E_short.shape} and dtype {E_short.dtype}")
+    print(f"E_long loaded with shape {E_long.shape} and dtype {E_long.dtype}")
+    E_qwen3 = 0.4 * E_short + 0.6 * E_long
     e_norms = np.linalg.norm(E_qwen3, axis=1)
     zero_norms = np.sum(e_norms == 0)
     if zero_norms:
