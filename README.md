@@ -61,3 +61,16 @@ To resume from a specific chunk, set the `START_CHUNK` environment variable. For
 set START_CHUNK=5 && set PYTHONUNBUFFERED=1 && docker compose --profile train up --build ml-train
 ```
 
+### Optional Qwen3 model
+
+The ML image bundles `ml/models/Qwen3-Embedding-4B` so that chunks 1–4 run out of the
+box. To skip this large directory (useful when starting at chunk 5) build with:
+
+```bash
+docker build -f ml/Dockerfile --build-arg INCLUDE_QWEN=false ml
+```
+
+The `INCLUDE_QWEN` build argument deletes only the Qwen3 folder, leaving any other
+subdirectories under `ml/models` intact. You can still mount the model at runtime and
+point `QWEN3_MODEL_DIR` to its location if needed.
+

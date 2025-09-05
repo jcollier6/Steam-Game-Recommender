@@ -1,5 +1,7 @@
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 
+ARG INCLUDE_QWEN=true
+
 WORKDIR /app
 
 # Install Python and basic tools
@@ -21,5 +23,11 @@ RUN pip install fastapi uvicorn scikit-learn torch joblib
 
 # Now copy your actual code (only if needed)
 COPY . .
+
+# Optionally drop the heavy Qwen3 embedding model to speed up builds when
+# starting from later chunks.
+RUN if [ "$INCLUDE_QWEN" != "true" ]; then \
+      rm -rf models/Qwen3-Embedding-4B; \
+    fi
 
 # Entrypoint is defined by docker-compose
