@@ -24,8 +24,8 @@ def main():
         type=int,
         default=1,
         help=(
-            "chunk selector. 1 = run full pipeline; >1 = run only that chunk. "
-            "Allowed values: 1–6 or 10 (10 selects the 'chunk10' step)."
+            "first chunk to run. 1 runs full pipeline. Allowed values: 1–6 "
+            "or 10 (10 selects the 'chunk10' step)."
         ),
     )
     parser.add_argument(
@@ -73,31 +73,22 @@ def main():
         ("chunk10", lambda: chunk10_train.train_model(num_epochs=epochs)),
     ]
 
-    # Determine execution mode: full pipeline starting at 1, or single chunk
-    start_idx = max(1, int(args.start))
-    run_single = start_idx != 1
+    # Determine starting chunk and slice the remaining steps
+    start_chunk = max(1, int(args.start))
 
-    # Allowed numeric selectors for single-run
-    allowed_single = {2, 3, 4, 5, 6, 10}
-    if run_single and start_idx not in allowed_single:
+    # Map chunk numbers (1-6,10) to index positions in ``steps``
+    chunk_map = {
+        int(name.replace("chunk", "")): idx
+        for idx, (name, _) in enumerate(steps, start=1)
+    }
+    allowed = set(chunk_map.keys())
+    if start_chunk not in allowed:
         raise SystemExit(
-            f"Invalid --start {start_idx}. Allowed single chunks: {sorted(allowed_single)}; use 1 for full pipeline."
+            f"Invalid --start {start_chunk}. Allowed chunks: {sorted(allowed)}"
         )
 
-    # Map of index->(name, func)
-    steps_map = {i + 1: pair for i, pair in enumerate(steps)}
-
-    # Translate 10 → the step name 'chunk10'
-    if start_idx == 10:
-        for i, (nm, _) in enumerate(steps, start=1):
-            if nm == "chunk10":
-                start_idx = i
-                break
-
-    if run_single:
-        steps_to_run = [steps_map[start_idx]]
-    else:
-        steps_to_run = steps[start_idx - 1 :]
+    start_idx = chunk_map[start_chunk]
+    steps_to_run = steps[start_idx - 1 :]
 
     total_steps = len(steps_to_run)
 
@@ -118,8 +109,8 @@ def main():
         )
         return result
 
-    # Pre-flight check for single-chunk mode
-    if run_single:
+    # Pre-flight check when starting from a later chunk
+    if start_idx > 1:
         data_dir = os.getenv("ML_DATA_DIR", "ml/data")
         name, _ = steps_to_run[0]
         def req(paths):
@@ -132,7 +123,7 @@ def main():
                 if not ok:
                     missing.append(full)
             if missing:
-                raise SystemExit("Missing required artifacts for single-chunk run. See 'MISS' above.")
+                raise SystemExit("Missing required artifacts. See 'MISS' above.")
 
         def print_structured_quantiles():
             qpath = os.path.join(data_dir, "structured_quantiles.json")
