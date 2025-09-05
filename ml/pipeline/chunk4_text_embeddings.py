@@ -18,12 +18,18 @@ def embed_texts(
 
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "true")
 
-    model_id = "Qwen/Qwen3-Embedding-4B"
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
-    model = AutoModel.from_pretrained(
-        model_id,
+    model_dir = os.getenv("QWEN3_MODEL_DIR", "ml/models/Qwen3-Embedding-4B")
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_dir,
         trust_remote_code=True,
-        dtype=torch.float16,
+        local_files_only=True,
+    )
+    model = AutoModel.from_pretrained(
+        model_dir,
+        trust_remote_code=True,
+        local_files_only=True,
+        torch_dtype=torch.float16 if device.startswith("cuda") else torch.float32,
+
         attn_implementation="sdpa",
     ).to(device)
     model.eval()

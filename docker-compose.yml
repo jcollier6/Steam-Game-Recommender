@@ -120,6 +120,8 @@ services:
       context: ./ml
       dockerfile: Dockerfile
     env_file: .env
+    environment:
+      - QWEN3_MODEL_DIR=/app/ml/models/Qwen3-Embedding-4B
     depends_on:
       - mysql
     networks:
