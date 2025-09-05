@@ -11,8 +11,6 @@ from .utils import save_numpy
 def embed_texts(
     games_df: pd.DataFrame,
     device: str = "cpu",
-    batch_size: int = 256,
-    log_every: int = 20,
     short_max_length: int = 96,
     long_max_length: int = 1024,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -31,6 +29,7 @@ def embed_texts(
         trust_remote_code=True,
         local_files_only=True,
         torch_dtype=torch.float16 if device.startswith("cuda") else torch.float32,
+
         attn_implementation="sdpa",
     ).to(device)
     model.eval()
@@ -46,6 +45,8 @@ def embed_texts(
     embeddings_short: List[np.ndarray] = []
     embeddings_long: List[np.ndarray] = []
     total_tokens = 0
+    batch_size = 64
+    log_every = 80
     start_total = time.time()
 
     with torch.inference_mode(), torch.autocast(device_type="cuda", dtype=torch.float16):
@@ -94,7 +95,7 @@ def embed_texts(
                 remaining = len(games_df) - processed
                 print(
                     f"Batch {batch_idx}: processed {processed}/{len(games_df)} rows, "
-                    f"{remaining} remaining at {tok_per_sec:.0f} tok/s",
+                    f"{remaining} remaining at {tok_per_sec:.0f} tok/s", flush=True
                 )
 
     total_time = time.time() - start_total
@@ -106,8 +107,6 @@ def embed_texts(
 
 def run_text_embeddings(
     games_df: pd.DataFrame,
-    batch_size: int = 256,
-    log_every: int = 20,
     short_max_length: int = 96,
     long_max_length: int = 1024,
 ) -> None:
@@ -117,8 +116,6 @@ def run_text_embeddings(
     E_short, E_long = embed_texts(
         games_df,
         device,
-        batch_size=batch_size,
-        log_every=log_every,
         short_max_length=short_max_length,
         long_max_length=long_max_length,
     )
