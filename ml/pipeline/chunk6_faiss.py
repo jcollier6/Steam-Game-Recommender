@@ -25,13 +25,13 @@ def build_faiss_indices() -> None:
     meta_app_ids = np.array(list(app_id_to_meta_index.keys()), dtype=int)
     meta_indices = np.array(list(app_id_to_meta_index.values()), dtype=int)
 
-    # Load tag PCA embeddings and align using intersection of app_ids
-    T_pca_all = load_numpy('ml/data/T_pca_norm.npy').astype(np.float32)
-    tag_app_ids = load_numpy('ml/data/tag_pca_app_ids.npy').astype(int)
+    # Load tag embeddings and align using intersection of app_ids
+    tag_emb_all = load_numpy('ml/data/tag_game_emb.npy').astype(np.float32)
+    tag_app_ids = load_numpy('ml/data/tag_app_ids.npy').astype(int)
     common_app_ids, tag_idx, meta_pos = np.intersect1d(
         tag_app_ids, meta_app_ids, return_indices=True
     )
-    T_final = T_pca_all[tag_idx]
+    T_final = tag_emb_all[tag_idx]
     kept_app_ids = common_app_ids.astype(int).tolist()
 
     # Build tags FAISS index

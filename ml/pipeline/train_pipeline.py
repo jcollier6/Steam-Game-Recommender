@@ -174,15 +174,15 @@ def main():
                 "structured_app_ids.npy",  # from chunk2
                 "structured_min.npy",      # from chunk2
                 "structured_max.npy",      # from chunk2
-                "T_pca_norm.npy",          # from chunk3
+                "tag_game_emb.npy",       # from chunk3
                 "E_qwen3_short.npy",      # from chunk4
                 "E_qwen3_long.npy",       # from chunk4
-                "tag_pca_app_ids.npy",     # from chunk3
+                "tag_app_ids.npy",        # from chunk3
             ])
             print_structured_quantiles()
         elif name == "chunk6":
             req([
-                "T_pca_norm.npy",          # from chunk3
+                "tag_game_emb.npy",       # from chunk3
                 "item_meta_embs.npy",      # from chunk5
                 "structured_app_ids.npy",  # from chunk2
             ])
@@ -193,9 +193,9 @@ def main():
                 "app_id_to_meta_index.json", # from chunk5
                 "global_popular_games.json", # from chunk1
                 "item_meta_embs.npy",        # from chunk5
-                "T_pca_norm.npy",            # from chunk3
+                "tag_game_emb.npy",         # from chunk3
                 "structured_app_ids.npy",    # from chunk2
-                "global_tag_mean.npy",       # from chunk3
+                "tag_global_mean.npy",       # from chunk3
             ])
             print_structured_quantiles()
 

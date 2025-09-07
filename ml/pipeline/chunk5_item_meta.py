@@ -37,7 +37,7 @@ def run_item_meta_embedding() -> None:
         appid_to_rowidx = {int(k): int(v) for k, v in json.load(f).items()}
 
     # Load tag/text embeddings and their app_id arrays
-    T_pca_norm = load_numpy('ml/data/T_pca_norm.npy')
+    tag_game_emb_all = load_numpy('ml/data/tag_game_emb.npy')
     E_short = load_numpy('ml/data/E_qwen3_short.npy')
     E_long = load_numpy('ml/data/E_qwen3_long.npy')
     print(f"E_short loaded with shape {E_short.shape} and dtype {E_short.dtype}")
@@ -49,9 +49,9 @@ def run_item_meta_embedding() -> None:
         print(f"E_qwen3 zero-norm rows: {zero_norms}")
     e_norms[e_norms == 0] = 1
     E_qwen3 = E_qwen3 / e_norms[:, None]
-    tag_app_ids = load_numpy('ml/data/tag_pca_app_ids.npy')
+    app_ids_all = load_numpy('ml/data/tag_app_ids.npy')
 
-    tag_idx_map = {int(aid): idx for idx, aid in enumerate(tag_app_ids)}
+    tag_idx_map = {int(aid): idx for idx, aid in enumerate(app_ids_all)}
     # Build reverse mapping rowidx->appid to iterate in structured order
     num_rows = len(appid_to_rowidx)
     row_to_appid = [None] * num_rows
@@ -60,7 +60,7 @@ def run_item_meta_embedding() -> None:
             row_to_appid[ridx] = int(aid)
 
     structured_f = []
-    T_f = []
+    tag_emb_f = []
     E_f = []
     app_ids_f = []
     for ridx, aid in enumerate(row_to_appid):
@@ -70,19 +70,19 @@ def run_item_meta_embedding() -> None:
         if t_idx is None:
             continue
         structured_f.append(X_structured[ridx])
-        T_f.append(T_pca_norm[t_idx])
+        tag_emb_f.append(tag_game_emb_all[t_idx])
         E_f.append(E_qwen3[t_idx])
         app_ids_f.append(aid)
 
     structured = np.array(structured_f)
-    T_pca_norm = np.array(T_f)
+    tag_game_emb = np.array(tag_emb_f)
     E_qwen3 = np.array(E_f)
     app_ids = np.array(app_ids_f)
     print(f"X_structured dims: {structured.shape}")
-    print(f"T_pca_norm dims: {T_pca_norm.shape}")
+    print(f"tag_game_emb dims: {tag_game_emb.shape}")
     print(f"E_qwen3 dims: {E_qwen3.shape}")
     # X_structured is already scaled; concatenate directly with tag PCs and text embeddings
-    item_meta_raw = np.concatenate([structured, T_pca_norm, E_qwen3], axis=1)
+    item_meta_raw = np.concatenate([structured, tag_game_emb, E_qwen3], axis=1)
     print(f"item_meta_raw shape: {item_meta_raw.shape}")
     norms = np.linalg.norm(item_meta_raw, axis=1, keepdims=True)
     norms[norms == 0] = 1e-8
@@ -114,7 +114,7 @@ def run_item_meta_embedding() -> None:
     save_json(mapping, 'ml/data/app_id_to_meta_index.json')
     schema = {
         'structured': int(structured.shape[1]),
-        'tag': int(T_pca_norm.shape[1]),
+        'tag': int(tag_game_emb.shape[1]),
         'text': int(E_qwen3.shape[1]),
         'final': int(embs_np.shape[1]),
     }
