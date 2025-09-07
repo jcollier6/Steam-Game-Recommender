@@ -7,7 +7,7 @@ import pandas as pd
 
 from .utils import load_numpy, build_id_to_index_map, get_current_utc_date
 
-_T_PCA_NORM = None
+_TAG_GAME_EMB = None
 _TAG_APP_ID_TO_INDEX = None
 _STRUCTURED_OK = None
 _GLOBAL_TAG_MEAN = None
@@ -30,19 +30,19 @@ def compute_user_meta_raw(
     if data_dir is None:
         data_dir = os.getenv("ML_DATA_DIR", "ml/data")
 
-    global _T_PCA_NORM, _TAG_APP_ID_TO_INDEX, _STRUCTURED_OK, _GLOBAL_TAG_MEAN
-    if _T_PCA_NORM is None:
-        _T_PCA_NORM = load_numpy(os.path.join(data_dir, 'T_pca_norm.npy'))
-        tag_app_ids = load_numpy(os.path.join(data_dir, 'tag_pca_app_ids.npy')).tolist()
+    global _TAG_GAME_EMB, _TAG_APP_ID_TO_INDEX, _STRUCTURED_OK, _GLOBAL_TAG_MEAN
+    if _TAG_GAME_EMB is None:
+        _TAG_GAME_EMB = load_numpy(os.path.join(data_dir, 'tag_game_emb.npy'))
+        tag_app_ids = load_numpy(os.path.join(data_dir, 'tag_app_ids.npy')).tolist()
         _TAG_APP_ID_TO_INDEX = build_id_to_index_map([int(a) for a in tag_app_ids])
         try:
             with open(os.path.join(data_dir, 'appid_to_rowidx.json'), 'r', encoding='utf-8') as f:
                 _STRUCTURED_OK = set(int(k) for k in json.load(f).keys())
         except Exception:
             _STRUCTURED_OK = None
-        _GLOBAL_TAG_MEAN = load_numpy(os.path.join(data_dir, 'global_tag_mean.npy'))
+        _GLOBAL_TAG_MEAN = load_numpy(os.path.join(data_dir, 'tag_global_mean.npy'))
 
-    T_pca_norm = _T_PCA_NORM
+    tag_game_emb = _TAG_GAME_EMB
     tag_app_id_to_index = _TAG_APP_ID_TO_INDEX
     structured_ok = _STRUCTURED_OK
     global_tag_mean = _GLOBAL_TAG_MEAN
@@ -58,8 +58,8 @@ def compute_user_meta_raw(
             if structured_ok is not None and a not in structured_ok:
                 continue
             idx = tag_app_id_to_index.get(a)
-            if idx is not None and idx < len(T_pca_norm):
-                vectors.append(T_pca_norm[int(idx)])
+            if idx is not None and idx < len(tag_game_emb):
+                vectors.append(tag_game_emb[int(idx)])
         if vectors:
             user_tag_profile = np.mean(
                 np.stack(vectors, axis=0), axis=0, dtype=np.float32

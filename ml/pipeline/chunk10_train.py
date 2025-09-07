@@ -76,7 +76,7 @@ def train_model(
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    tag_dim = load_numpy(os.path.join(data_dir, "T_pca_norm.npy")).shape[1]
+    tag_dim = load_numpy(os.path.join(data_dir, "tag_game_emb.npy")).shape[1]
 
     tables = EmbeddingTables(len(user_ids), len(app_id_to_index))
     tables.user_emb = tables.user_emb.to(device)
