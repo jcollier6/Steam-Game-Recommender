@@ -133,9 +133,10 @@ def train_model(
     def validate() -> Tuple[float, float, float]:
         pair_correct = 0
         pair_total = 0
-        hit_count = 0
+        hits = 0
         ndcg_sum = 0.0
-        users_evaluated = 0
+        total_pos = 0
+        all_items = [int(k) for k in app_id_to_index.keys()]
         for uid in user_ids:
             val_df = splits[uid]["val"]
             if val_df.empty:
@@ -148,6 +149,11 @@ def train_model(
             if pos_mask.sum() == 0 or pos_mask.sum() == len(val_df):
                 continue
             u_idx = user_id_map[uid]
+            user_pos_all = set(
+                splits[uid]["train"]["app_id"].tolist()
+                + splits[uid]["val"]["app_id"].tolist()
+                + splits[uid]["test"]["app_id"].tolist()
+            )
             with torch.no_grad():
                 u_emb = tables.user_emb(
                     torch.tensor([u_idx], dtype=torch.long, device=device)
@@ -179,21 +185,45 @@ def train_model(
                     continue
                 pair_correct += (pos_scores[:, None] > neg_scores[None, :]).sum()
                 pair_total += len(pos_scores) * len(neg_scores)
-                ranking = np.argsort(-scores_np)
-                topk = labels_np[ranking][:10]
-                hit_count += 1 if topk.max() == 1 else 0
-                gains = (2 ** topk - 1) / np.log2(np.arange(1, len(topk) + 1) + 1)
-                dcg = gains.sum()
-                ideal = np.sort(labels_np)[::-1][:10]
-                ideal_gains = (2 ** ideal - 1) / np.log2(
-                    np.arange(1, len(ideal) + 1) + 1
-                )
-                idcg = ideal_gains.sum() if ideal_gains.sum() > 0 else 1.0
-                ndcg_sum += dcg / idcg
-                users_evaluated += 1
+
+                # Per-positive ranking evaluation
+                for pos_app in val_df[pos_mask]["app_id"].tolist():
+                    neg_pool = [
+                        a
+                        for a in global_popular
+                        if a not in user_pos_all and a != pos_app
+                    ]
+                    if len(neg_pool) < 99:
+                        neg_pool = [
+                            a for a in all_items if a not in user_pos_all and a != pos_app
+                        ]
+                    if len(neg_pool) < 99:
+                        continue
+                    negatives = np.random.choice(neg_pool, 99, replace=False)
+                    candidates = [pos_app] + list(negatives)
+                    idxs = [app_id_to_index.get(str(c), 0) for c in candidates]
+                    idx_tensor = torch.tensor(idxs, dtype=torch.long, device=device)
+                    item_embs = tables.item_emb(idx_tensor)
+                    item_meta = item_meta_embs[idx_tensor]
+                    u_rep = u_emb.repeat(len(candidates), 1)
+                    um_rep = user_meta_emb.repeat(len(candidates), 1)
+                    x = torch.cat([u_rep, um_rep, item_embs, item_meta], dim=1)
+                    cand_scores = score_mlp(x).view(-1).cpu().numpy()
+                    cand_labels = np.zeros(len(candidates), dtype=int)
+                    cand_labels[0] = 1
+                    ranking = np.argsort(-cand_scores)
+                    rank_pos = np.where(ranking == 0)[0][0]
+                    if rank_pos < 10:
+                        hits += 1
+                    topk = cand_labels[ranking][:10]
+                    gains = (2 ** topk - 1) / np.log2(
+                        np.arange(1, len(topk) + 1) + 1
+                    )
+                    ndcg_sum += gains.sum()  # idcg is 1 when only one positive
+                    total_pos += 1
         pair_acc = pair_correct / pair_total if pair_total else float("nan")
-        hit10 = hit_count / users_evaluated if users_evaluated else float("nan")
-        ndcg10 = ndcg_sum / users_evaluated if users_evaluated else float("nan")
+        hit10 = hits / total_pos if total_pos else float("nan")
+        ndcg10 = ndcg_sum / total_pos if total_pos else float("nan")
         return pair_acc, hit10, ndcg10
 
     if adaptive:
