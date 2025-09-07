@@ -161,25 +161,12 @@ def main():
                     ]
                     print(
                         "structured_quantiles: "
-                        f"metrics={len(metrics)} "
+                        f"metrics={metrics} "
                         f"global_p_high={phg} "
                         f"overrides={overrides}"
                     )
                 except Exception as e:
                     print(f"[warn] Could not read structured_quantiles.json: {e}")
-
-        def print_tag_map_info():
-            mpath = os.path.join(data_dir, "tag_id_map.json")
-            if os.path.exists(mpath):
-                try:
-                    import json
-
-                    with open(mpath, "r", encoding="utf-8") as f:
-                        tags = json.load(f)
-
-                    print(f"tag_id_map entries={len(tags)}")
-                except Exception as e:
-                    print(f"[warn] Could not read tag_id_map.json: {e}")
 
         def print_tag_pca_info():
             tpath = os.path.join(data_dir, "T_pca_norm.npy")
@@ -213,7 +200,6 @@ def main():
             print_structured_quantiles()
         elif name == "chunk3":
             req(["games_df.pkl", "tag_id_map.json"])  # from chunk1
-            print_tag_map_info()
             print_structured_quantiles()
         elif name == "chunk4":
             req(["games_df.pkl"])  # from chunk1
