@@ -40,6 +40,12 @@ def main():
         default=None,
         help="override NUM_EPOCHS env for chunk10 training",
     )
+    parser.add_argument(
+        "--svd_dim",
+        type=int,
+        default=None,
+        help="override tag embedding dimension for chunk3",
+    )
     args = parser.parse_args()
 
     start_time = time.time()
@@ -72,7 +78,12 @@ def main():
                 load_games_df(), get_current_utc_date()
             ),
         ),
-        ("chunk3", lambda: chunk3_tags_pca.run_tag_pca(load_games_df())),
+        (
+            "chunk3",
+            lambda: chunk3_tags_pca.run_tag_pca(
+                load_games_df(), svd_dim=args.svd_dim or 192
+            ),
+        ),
         ("chunk4", lambda: chunk4_text_embeddings.run_text_embeddings(load_games_df())),
         ("chunk5", chunk5_item_meta.run_item_meta_embedding),
         ("chunk6", chunk6_faiss.build_faiss_indices),
