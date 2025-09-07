@@ -144,40 +144,76 @@ def main():
             if os.path.exists(qpath):
                 try:
                     import json
+
                     with open(qpath, "r", encoding="utf-8") as f:
                         q = json.load(f)
-                    print("Structured thresholds:")
-                    phg = q.get('p_high_global')
-                    phm = q.get('p_high_by_metric', {})
-                    if phg is not None:
-                        print(f" - global_p_high={phg}")
-                    # Print only metrics that use winsorization (skip discount_percent)
-                    for key in [
-                        'positive_review_count',
-                        'negative_review_count',
-                        'price_usd',
-                    ]:
-                        if key in q:
-                            lo = q[key].get('low')
-                            hi = q[key].get('high')
-                            zeros = q[key].get('zeros')
-                            print(f" - {key}: low={lo} high={hi} zeros={zeros}")
-                    # Show per-metric p_high overrides (excluding discount_percent)
-                    if phm:
-                        cnt = phm.get('counts')
-                        prc = phm.get('price_usd')
-                        if cnt is not None:
-                            print(f" - counts_p_high={cnt}")
-                        if prc is not None:
-                            print(f" - price_p_high={prc}")
+
+                    metrics = [
+                        k
+                        for k in q.keys()
+                        if k not in {"p_high_global", "p_high_by_metric", "discount_percent"}
+                    ]
+                    phg = q.get("p_high_global")
+                    overrides = [
+                        k
+                        for k in q.get("p_high_by_metric", {}).keys()
+                        if k != "discount_percent"
+                    ]
+                    print(
+                        "structured_quantiles: "
+                        f"metrics={len(metrics)} "
+                        f"global_p_high={phg} "
+                        f"overrides={overrides}"
+                    )
                 except Exception as e:
                     print(f"[warn] Could not read structured_quantiles.json: {e}")
+
+        def print_tag_map_info():
+            mpath = os.path.join(data_dir, "tag_id_map.json")
+            if os.path.exists(mpath):
+                try:
+                    import json
+
+                    with open(mpath, "r", encoding="utf-8") as f:
+                        tags = json.load(f)
+
+                    print(f"tag_id_map entries={len(tags)}")
+                except Exception as e:
+                    print(f"[warn] Could not read tag_id_map.json: {e}")
+
+        def print_tag_pca_info():
+            tpath = os.path.join(data_dir, "T_pca_norm.npy")
+            ids_path = os.path.join(data_dir, "tag_pca_app_ids.npy")
+            gmean_path = os.path.join(data_dir, "global_tag_mean.npy")
+            try:
+                t_shape = (
+                    np.load(tpath, mmap_mode="r").shape if os.path.exists(tpath) else None
+                )
+                ids_count = (
+                    np.load(ids_path, mmap_mode="r").shape[0]
+                    if os.path.exists(ids_path)
+                    else None
+                )
+                gmean_dim = (
+                    np.load(gmean_path, mmap_mode="r").shape[0]
+                    if os.path.exists(gmean_path)
+                    else None
+                )
+                print(
+                    "tag_pca: "
+                    f"T_shape={t_shape} "
+                    f"app_ids={ids_count} "
+                    f"global_mean_dim={gmean_dim}"
+                )
+            except Exception as e:
+                print(f"[warn] Could not read tag PCA artifacts: {e}")
 
         if name == "chunk2":
             req(["games_df.pkl"])  # from chunk1
             print_structured_quantiles()
         elif name == "chunk3":
             req(["games_df.pkl", "tag_id_map.json"])  # from chunk1
+            print_tag_map_info()
             print_structured_quantiles()
         elif name == "chunk4":
             req(["games_df.pkl"])  # from chunk1
@@ -193,6 +229,7 @@ def main():
                 "E_qwen3_long.npy",       # from chunk4
                 "tag_app_ids.npy",        # from chunk3
             ])
+            print_tag_pca_info()
             print_structured_quantiles()
         elif name == "chunk6":
             req([
@@ -200,6 +237,7 @@ def main():
                 "item_meta_embs.npy",      # from chunk5
                 "structured_app_ids.npy",  # from chunk2
             ])
+            print_tag_pca_info()
             print_structured_quantiles()
         elif name == "chunk10":
             req([
@@ -211,6 +249,7 @@ def main():
                 "structured_app_ids.npy",    # from chunk2
                 "tag_global_mean.npy",       # from chunk3
             ])
+            print_tag_pca_info()
             print_structured_quantiles()
 
     for name, func in steps_to_run:
