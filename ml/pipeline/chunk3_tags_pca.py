@@ -32,6 +32,8 @@ def run_tag_pca(
 ) -> None:
     """Build robust tag-based game embeddings.
 
+    The function emits progress metrics – tag coverage, training matrix
+    density, and SVD explained variance – to help monitor embedding quality.
     IDF weighting, co-tag PMI boosts and CDS-smoothed SPPMI produce dense
     embeddings whose artifacts are written to ``ml/data``.
     """
@@ -65,6 +67,10 @@ def run_tag_pca(
         if keep_mask[int(j)]
     }
     V_kept = len(kept_indices)
+    print(
+        f"[chunk3] Keeping {V_kept}/{V} tags after min_df>={int(min_tag_df)} filter",
+        flush=True,
+    )
 
     # ------------------------------------------------------------------
     # Co-tag PMI table (binary counts)
@@ -122,6 +128,11 @@ def run_tag_pca(
     if not data:
         raise RuntimeError("No tag edges found to build embeddings")
     W = sparse.csr_matrix((data, (rows, cols)), shape=(N_train, V_kept), dtype=np.float64)
+    mean_tags = float(W.getnnz(axis=1).mean()) if N_train > 0 else 0.0
+    print(
+        f"[chunk3] Training matrix built for {N_train} games (avg tags/game={mean_tags:.2f})",
+        flush=True,
+    )
 
     # Co-tag PMI boost per game
     for i in range(N_train):
@@ -157,6 +168,11 @@ def run_tag_pca(
             val = math.log(p_ij) - math.log(p_i[i]) - alpha_cds * math.log(p_t[j]) - log_k
             sppmi_vals.append(val if val > 0 else 0.0)
     S = sparse.csr_matrix((sppmi_vals, (W_coo.row, W_coo.col)), shape=(N_train, V_kept), dtype=np.float64)
+    density = S.nnz / max(S.shape[0] * S.shape[1], 1)
+    print(
+        f"[chunk3] SPPMI matrix {S.shape} with {S.nnz} non-zeros (density={density:.6f})",
+        flush=True,
+    )
 
     # ------------------------------------------------------------------
     # Truncated SVD and normalization
@@ -167,6 +183,12 @@ def run_tag_pca(
     norms = np.linalg.norm(G, axis=1, keepdims=True)
     norms[norms == 0] = 1e-6
     G_norm = (G / norms).astype("float32")
+    exp_var = float(svd.explained_variance_ratio_.sum())
+    top5 = np.round(svd.explained_variance_ratio_[:5], 4).tolist()
+    print(
+        f"[chunk3] SVD explained variance {exp_var:.2%} (first 5 comps: {top5})",
+        flush=True,
+    )
 
     # ------------------------------------------------------------------
     # Persist artifacts
@@ -193,4 +215,6 @@ def run_tag_pca(
     save_json(params, "ml/data/tag_params.json")
     global_tag_mean = G_norm.mean(axis=0)
     save_numpy(global_tag_mean, "ml/data/tag_global_mean.npy")
-    print(f"✅ Chunk 3 tag embeddings saved (dim={k}, games={N_train}, tags={V_kept})")
+    print(
+        f"✅ Chunk 3 tag embeddings saved (dim={k}, games={N_train}, tags={V_kept}, variance={exp_var:.2%})"
+    )

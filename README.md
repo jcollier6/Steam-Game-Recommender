@@ -25,7 +25,10 @@ This repository now includes a new modular pipeline under `ml/pipeline` implemen
 1. `chunk1_loader` – loads database tables, user interactions, and fetches the
    top most played games from the Steam Charts API.
 2. `chunk2_structured` – computes structured numeric features.
-3. `chunk3_tags_pca` – builds tag vectors and PCA embeddings.
+3. `chunk3_tags_pca` – builds tag vectors and PCA embeddings, printing
+   diagnostics such as tag coverage, SPPMI matrix sparsity, and the
+   proportion of variance captured by the truncated SVD (higher is
+   better).
 4. `chunk4_text_embeddings` – computes Qwen3 embeddings for short and long descriptions
    and stores them separately as `ml/data/E_qwen3_short.npy` and
    `ml/data/E_qwen3_long.npy`. The texts are truncated to 96 and 1,024 tokens,
