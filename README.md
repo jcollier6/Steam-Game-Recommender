@@ -61,3 +61,11 @@ To resume from a specific chunk, set the `START_CHUNK` environment variable. For
 set START_CHUNK=5 && set PYTHONUNBUFFERED=1 && docker compose --profile train up --build ml-train
 ```
 
+To run only a single chunk, use the `RUN_CHUNK` environment variable. For example, to run just chunk 3:
+
+```bash
+set RUN_CHUNK=3 && set PYTHONUNBUFFERED=1 && docker compose --profile train up --build ml-train
+```
+
+If both `RUN_CHUNK` and `START_CHUNK` are provided, only `RUN_CHUNK` is honored.
+

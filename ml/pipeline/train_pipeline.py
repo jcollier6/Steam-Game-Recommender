@@ -29,6 +29,12 @@ def main():
         ),
     )
     parser.add_argument(
+        "--chunk",
+        type=int,
+        default=None,
+        help="run only the specified chunk (1-6 or 10)",
+    )
+    parser.add_argument(
         "--epochs",
         type=int,
         default=None,
@@ -73,22 +79,30 @@ def main():
         ("chunk10", lambda: chunk10_train.train_model(num_epochs=epochs)),
     ]
 
-    # Determine starting chunk and slice the remaining steps
-    start_chunk = max(1, int(args.start))
-
+    # Determine which chunk(s) to run
     # Map chunk numbers (1-6,10) to index positions in ``steps``
     chunk_map = {
         int(name.replace("chunk", "")): idx
         for idx, (name, _) in enumerate(steps, start=1)
     }
     allowed = set(chunk_map.keys())
-    if start_chunk not in allowed:
-        raise SystemExit(
-            f"Invalid --start {start_chunk}. Allowed chunks: {sorted(allowed)}"
-        )
 
-    start_idx = chunk_map[start_chunk]
-    steps_to_run = steps[start_idx - 1 :]
+    if args.chunk is not None:
+        run_chunk = max(1, int(args.chunk))
+        if run_chunk not in allowed:
+            raise SystemExit(
+                f"Invalid --chunk {run_chunk}. Allowed chunks: {sorted(allowed)}"
+            )
+        start_idx = chunk_map[run_chunk]
+        steps_to_run = [steps[start_idx - 1]]
+    else:
+        start_chunk = max(1, int(args.start))
+        if start_chunk not in allowed:
+            raise SystemExit(
+                f"Invalid --start {start_chunk}. Allowed chunks: {sorted(allowed)}"
+            )
+        start_idx = chunk_map[start_chunk]
+        steps_to_run = steps[start_idx - 1 :]
 
     total_steps = len(steps_to_run)
 
