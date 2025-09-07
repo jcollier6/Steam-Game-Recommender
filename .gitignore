@@ -75,3 +75,6 @@ ml/data
 
 # Training user ids
 gatherer/training_steamids.txt
+
+# ML metrics
+ml/metrics/
