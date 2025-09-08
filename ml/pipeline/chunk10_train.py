@@ -237,7 +237,7 @@ def train_model(
             flush=True,
         )
     else:
-        print(f"Training for {num_epochs} epoch(s)")
+        print(f"Training for {num_epochs} epoch(s)", flush=True)
 
     best_loss = float("inf")
     no_improve = 0
@@ -297,7 +297,8 @@ def train_model(
         total = num_epochs if not adaptive else (f"≤{max_epochs}")
         print(
             f"epoch {epoch+1}/{total} loss {avg_loss:.4f} "
-            f"pair_acc {pair_acc:.4f} hit10 {hit10:.4f} ndcg10 {ndcg10:.4f}"
+            f"pair_acc {pair_acc:.4f} hit10 {hit10:.4f} ndcg10 {ndcg10:.4f}",
+            flush=True
         )
 
         # Early stopping logic
