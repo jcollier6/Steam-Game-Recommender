@@ -34,6 +34,7 @@ __all__ = [
     "chunk10_train",
     "chunk11_inference",
     "train_pipeline",
+    "build_item_meta",
 ]
 
 
@@ -43,4 +44,17 @@ def __getattr__(name: str):
         globals()[name] = module
         return module
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def build_item_meta(mode: str):
+    """Factory for :class:`ItemMetaFC` using the stored schema."""
+    import os
+    import json
+
+    data_dir = os.getenv("ML_DATA_DIR", "ml/data")
+    schema_path = os.path.join(data_dir, "item_meta_schema.json")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema = json.load(f)
+    input_dim = schema["structured"] + schema["tag"] + schema["text"]
+    return chunk5_item_meta.ItemMetaFC(input_dim, mode=mode)
 
