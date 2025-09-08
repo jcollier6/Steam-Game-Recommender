@@ -42,3 +42,14 @@ class ScoreMLP(nn.Module):
         x = self.fc3(x)
         return x
 
+
+class ScoreBilinear(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.bilinear = nn.Bilinear(256, 256, 1)
+
+    def forward(self, x):
+        user = x[:, :256]
+        item = x[:, 256:]
+        return self.bilinear(user, item)
+
