@@ -32,8 +32,18 @@ def load_torch(path, device='cpu'):
     return torch.load(path, map_location=device)
 
 
-def build_id_to_index_map(ids):
-    return {id_: idx for idx, id_ in enumerate(ids)}
+def build_id_to_index_map(ids, start: int = 0):
+    """Create a mapping from identifier to sequential index.
+
+    Parameters
+    ----------
+    ids : Iterable
+        Sequence of identifiers to map.
+    start : int, optional
+        Starting index for the mapping. Use ``start=1`` when reserving
+        index ``0`` for padding, by default ``0``.
+    """
+    return {id_: idx + start for idx, id_ in enumerate(ids)}
 
 
 def get_current_utc_date() -> datetime:
