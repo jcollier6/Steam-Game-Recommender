@@ -42,7 +42,7 @@ def _split_by_user(df: pd.DataFrame) -> Dict[int, Dict[str, pd.DataFrame]]:
 
 
 def _sample_negative(user_pos: Set[int], all_items: List[int]) -> int:
-    """Sample a negative item that the user has not interacted with."""
+    """Sample a negative item outside the user's known positives (train/val/test)."""
     while True:
         neg = int(np.random.choice(all_items))
         if neg not in user_pos:
@@ -271,8 +271,12 @@ def train_model(
                 pos_list = pos_df["app_id"].tolist()
                 if not pos_list:
                     continue
-                user_pos_list = train_df["app_id"].tolist()
-                user_pos_set = set(user_pos_list)
+                user_pos_set = set(
+                    splits[u]["train"]["app_id"].tolist()
+                    + splits[u]["val"]["app_id"].tolist()
+                    + splits[u]["test"]["app_id"].tolist()
+                )
+                # Sample negatives excluding all known positives across splits
                 neg_list = [
                     _sample_negative(user_pos_set, all_items)
                     for _ in pos_list
