@@ -64,7 +64,8 @@ def train_model(
     interactions = pd.read_pickle(os.path.join(data_dir, "interactions_df.pkl"))
     splits = _split_by_user(interactions)
     user_ids = sorted(splits.keys())
-    user_id_map = build_id_to_index_map(user_ids)
+    # Map user IDs to embedding indices starting from 1; index 0 is padding
+    user_id_map = build_id_to_index_map(user_ids, start=1)
     save_json(user_id_map, os.path.join(data_dir, "user_id_to_index.json"))
     app_id_to_index = load_json(os.path.join(data_dir, "app_id_to_meta_index.json"))
     all_items = [int(a) for a in app_id_to_index.keys()]
@@ -78,7 +79,9 @@ def train_model(
     tables.user_emb = tables.user_emb.to(device)
     tables.item_emb = tables.item_emb.to(device)
     user_meta_fc = UserMetaFC(tag_dim + 1).to(device)
-    score_mlp = ScoreMLP(len(user_ids), len(app_id_to_index)).to(device)
+    score_mlp = ScoreMLP(
+        tables.user_emb.num_embeddings, tables.item_emb.num_embeddings
+    ).to(device)
 
     params = list(tables.user_emb.parameters()) + list(tables.item_emb.parameters())
     params += list(user_meta_fc.parameters()) + list(score_mlp.parameters())
@@ -88,6 +91,10 @@ def train_model(
     item_meta_embs = torch.from_numpy(
         load_numpy(os.path.join(data_dir, "item_meta_embs.npy"))
     ).float().to(device)
+    item_meta_embs = torch.cat(
+        [torch.zeros(1, item_meta_embs.shape[1], device=device), item_meta_embs],
+        dim=0,
+    )
 
     user_meta_list: List[np.ndarray] = []
     for uid in user_ids:
@@ -95,6 +102,10 @@ def train_model(
         user_meta_list.append(meta_raw)
     user_meta_tensor = torch.tensor(
         np.vstack(user_meta_list), dtype=torch.float32, device=device
+    )
+    user_meta_tensor = torch.cat(
+        [torch.zeros(1, user_meta_tensor.shape[1], device=device), user_meta_tensor],
+        dim=0,
     )
 
     # Configure epoch schedule: fixed or adaptive and scheduler total steps
@@ -160,7 +171,8 @@ def train_model(
                 u_idx_tensor = torch.tensor([u_idx], dtype=torch.long, device=device)
                 for _, row in val_df.iterrows():
                     app = int(row["app_id"])
-                    idx = app_id_to_index.get(str(app), 0)
+                    meta_idx = app_id_to_index.get(str(app))
+                    idx = meta_idx + 1 if meta_idx is not None else 0
                     item_emb = tables.item_emb(
                         torch.tensor([idx], dtype=torch.long, device=device)
                     )
@@ -198,7 +210,10 @@ def train_model(
                         continue
                     negatives = np.random.choice(neg_pool, 99, replace=False)
                     candidates = [pos_app] + list(negatives)
-                    idxs = [app_id_to_index.get(str(c), 0) for c in candidates]
+                    idxs = []
+                    for c in candidates:
+                        meta_idx = app_id_to_index.get(str(c))
+                        idxs.append(meta_idx + 1 if meta_idx is not None else 0)
                     idx_tensor = torch.tensor(idxs, dtype=torch.long, device=device)
                     item_embs = tables.item_emb(idx_tensor)
                     item_meta = item_meta_embs[idx_tensor]
@@ -270,16 +285,16 @@ def train_model(
                 user_meta = user_meta_tensor[u_idx].unsqueeze(0)
                 user_meta_emb = user_meta_fc(user_meta)
 
-                pos_idx = torch.tensor(
-                    [app_id_to_index.get(str(p), 0) for p in pos_list],
-                    dtype=torch.long,
-                    device=device,
-                )
-                neg_idx = torch.tensor(
-                    [app_id_to_index.get(str(n), 0) for n in neg_list],
-                    dtype=torch.long,
-                    device=device,
-                )
+                pos_indices = []
+                for p in pos_list:
+                    meta_idx = app_id_to_index.get(str(p))
+                    pos_indices.append(meta_idx + 1 if meta_idx is not None else 0)
+                pos_idx = torch.tensor(pos_indices, dtype=torch.long, device=device)
+                neg_indices = []
+                for n in neg_list:
+                    meta_idx = app_id_to_index.get(str(n))
+                    neg_indices.append(meta_idx + 1 if meta_idx is not None else 0)
+                neg_idx = torch.tensor(neg_indices, dtype=torch.long, device=device)
 
                 pos_emb = tables.item_emb(pos_idx)
                 neg_emb = tables.item_emb(neg_idx)

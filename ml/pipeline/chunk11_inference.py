@@ -67,14 +67,17 @@ def recommend(
     map_path = os.path.join(data_dir, 'user_id_to_index.json')
     user_id_map = load_json(map_path) if os.path.exists(map_path) else {}
     item_meta_embs = load_numpy(os.path.join(data_dir, 'item_meta_embs.npy'))
+    item_meta_embs = np.vstack(
+        [np.zeros((1, item_meta_embs.shape[1]), dtype=item_meta_embs.dtype), item_meta_embs]
+    )
     index_meta = faiss.read_index(os.path.join(data_dir, 'faiss_meta.index'))
     index_to_app = load_json(os.path.join(data_dir, 'index_to_app_id_meta.json'))
     app_id_to_index = load_json(os.path.join(data_dir, 'app_id_to_meta_index.json'))
 
     allowed_items = {
-        int(app): idx
+        int(app): idx + 1
         for app, idx in app_id_to_index.items()
-        if idx < tables.item_emb.num_embeddings and idx < len(item_meta_embs)
+        if (idx + 1) < tables.item_emb.num_embeddings and (idx + 1) < len(item_meta_embs)
     }
 
     user_df = interactions_df[interactions_df['user_id'] == user_id]
@@ -163,18 +166,19 @@ def recommend(
                 | (user_df['playtime_2weeks'] > 0)
                 | (user_df['wishlisted'])
             ]['app_id'].unique()
-            item_indices = [
-                app_id_to_index.get(str(a))
-                for a in pos_apps
-                if app_id_to_index.get(str(a)) is not None
-                and app_id_to_index.get(str(a)) < tables.item_emb.num_embeddings
-            ]
+            item_indices: list[int] = []
+            for a in pos_apps:
+                meta_idx = app_id_to_index.get(str(a))
+                if meta_idx is not None:
+                    emb_idx = meta_idx + 1
+                    if emb_idx < tables.item_emb.num_embeddings:
+                        item_indices.append(emb_idx)
             if item_indices:
                 emb = tables.item_emb(torch.tensor(item_indices, device=device))
                 u_emb = emb.mean(dim=0, keepdim=True)
             else:
                 u_emb = tables.mean_user_emb.unsqueeze(0).to(device)
-            u_idx_tensor = None
+            u_idx_tensor = torch.tensor([0], dtype=torch.long, device=device)
         for app_id in candidate_ids:
             idx = allowed_items.get(app_id)
             if idx is None:

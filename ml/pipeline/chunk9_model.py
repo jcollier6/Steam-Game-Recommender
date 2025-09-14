@@ -24,8 +24,9 @@ class UserMetaFC(nn.Module):
 class ScoreMLP(nn.Module):
     def __init__(self, num_users: int, num_items: int):
         super().__init__()
-        self.user_bias = nn.Embedding(num_users, 1)
-        self.item_bias = nn.Embedding(num_items, 1)
+        # Reserve zero index for missing users/items
+        self.user_bias = nn.Embedding(num_users, 1, padding_idx=0)
+        self.item_bias = nn.Embedding(num_items, 1, padding_idx=0)
 
         self.fc1 = nn.Linear(512, 512)
         self.bn1 = nn.LayerNorm(512)
