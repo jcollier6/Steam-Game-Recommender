@@ -22,12 +22,14 @@ def _load_structured_schema(data_dir: str):
         return None
 
 
-def _filter_unique(candidates, K, exclude_ids):
+def _filter_unique(candidates, K, exclude_ids, allowed_ids=None):
     seen = set(int(x) for x in exclude_ids)
     results = []
     for c in candidates:
         app_id = int(c['app_id']) if isinstance(c, dict) else int(c)
         if app_id in seen:
+            continue
+        if allowed_ids is not None and app_id not in allowed_ids:
             continue
         seen.add(app_id)
         results.append(c)
@@ -55,17 +57,25 @@ def recommend(
         data_dir = os.getenv('ML_DATA_DIR', 'ml/data')
     tag_dim = load_numpy(os.path.join(data_dir, 'tag_game_emb.npy')).shape[1]
     user_meta_fc = UserMetaFC(tag_dim + 1).to(device)
-    score_mlp = ScoreMLP().to(device)
-    user_meta_fc.load_state_dict(load_torch(os.path.join(data_dir, 'user_meta_fc.pth'), device))
-    score_mlp.load_state_dict(load_torch(os.path.join(data_dir, 'score_mlp.pth'), device))
     tables = EmbeddingTables(0, 0)
     tables.load(os.path.join(data_dir, 'emb_tables'), device=device)
+    score_mlp = ScoreMLP(
+        tables.user_emb.num_embeddings, tables.item_emb.num_embeddings
+    ).to(device)
+    user_meta_fc.load_state_dict(load_torch(os.path.join(data_dir, 'user_meta_fc.pth'), device))
+    score_mlp.load_state_dict(load_torch(os.path.join(data_dir, 'score_mlp.pth'), device))
     map_path = os.path.join(data_dir, 'user_id_to_index.json')
     user_id_map = load_json(map_path) if os.path.exists(map_path) else {}
     item_meta_embs = load_numpy(os.path.join(data_dir, 'item_meta_embs.npy'))
     index_meta = faiss.read_index(os.path.join(data_dir, 'faiss_meta.index'))
     index_to_app = load_json(os.path.join(data_dir, 'index_to_app_id_meta.json'))
     app_id_to_index = load_json(os.path.join(data_dir, 'app_id_to_meta_index.json'))
+
+    allowed_items = {
+        int(app): idx
+        for app, idx in app_id_to_index.items()
+        if idx < tables.item_emb.num_embeddings and idx < len(item_meta_embs)
+    }
 
     user_df = interactions_df[interactions_df['user_id'] == user_id]
     if user_df.empty and user_library_df is not None:
@@ -95,10 +105,10 @@ def recommend(
             user_df = lib
         else:
             popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
-            return _filter_unique(popular, K, lib['app_id'].astype(int).tolist())
+            return _filter_unique(popular, K, lib['app_id'].astype(int).tolist(), allowed_items)
     elif user_df.empty:
         popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
-        return _filter_unique(popular, K, [])
+        return _filter_unique(popular, K, [], allowed_items)
 
     pos_mask_df = (
         (user_df['playtime_forever'] > 0)
@@ -107,7 +117,7 @@ def recommend(
     )
     if pos_mask_df.sum() < 20:
         popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
-        return _filter_unique(popular, K, user_df['app_id'].astype(int).tolist())
+        return _filter_unique(popular, K, user_df['app_id'].astype(int).tolist(), allowed_items)
 
     owned_ids = user_df['app_id'].astype(int).tolist()
     exclude_ids: set[int] = set(owned_ids)
@@ -130,21 +140,23 @@ def recommend(
         new_batch = []
         for idx in cand_idxs[0][start:search_k]:
             app_id = index_to_app[idx] if isinstance(index_to_app, list) else index_to_app[str(idx)]
-            if app_id in seen_cands:
+            if app_id in seen_cands or int(app_id) not in allowed_items:
                 continue
             seen_cands.add(app_id)
-            candidate_ids.append(app_id)
-            new_batch.append(app_id)
+            candidate_ids.append(int(app_id))
+            new_batch.append(int(app_id))
             if len(candidate_ids) >= K:
                 break
         print(f"searched {search_k}, new apps {new_batch}")
 
 
     scores = []
+    scored_ids: list[int] = []
     with torch.no_grad():
         idx_u = user_id_map.get(str(user_id))
         if idx_u is not None and idx_u < tables.user_emb.num_embeddings:
             u_emb = tables.user_emb(torch.tensor([idx_u], device=device))
+            u_idx_tensor = torch.tensor([idx_u], dtype=torch.long, device=device)
         else:
             pos_apps = user_df[
                 (user_df['playtime_forever'] > 0)
@@ -162,30 +174,29 @@ def recommend(
                 u_emb = emb.mean(dim=0, keepdim=True)
             else:
                 u_emb = tables.mean_user_emb.unsqueeze(0).to(device)
+            u_idx_tensor = None
         for app_id in candidate_ids:
-            idx = app_id_to_index.get(str(app_id), None)
-            if idx is not None and idx < tables.item_emb.num_embeddings:
-                i_emb = tables.item_emb(torch.tensor([idx], device=device))
-            else:
-                i_emb = tables.mean_item_emb.unsqueeze(0).to(device)
-            if idx is not None and idx < len(item_meta_embs):
-                i_meta = torch.from_numpy(item_meta_embs[idx]).float().unsqueeze(0).to(device)
-            else:
-                i_meta = torch.zeros((1, item_meta_embs.shape[1]), device=device)
+            idx = allowed_items.get(app_id)
+            if idx is None:
+                continue
+            i_emb = tables.item_emb(torch.tensor([idx], device=device))
+            item_idx_tensor = torch.tensor([idx], dtype=torch.long, device=device)
+            i_meta = torch.from_numpy(item_meta_embs[idx]).float().unsqueeze(0).to(device)
             feat = torch.cat([u_emb, user_meta_emb, i_emb, i_meta], dim=1)
-            s = score_mlp(feat)
+            s = score_mlp(feat, u_idx_tensor, item_idx_tensor)
             scores.append(s.item())
+            scored_ids.append(app_id)
 
-    ranked = [x for _, x in sorted(zip(scores, candidate_ids), key=lambda t: t[0], reverse=True)]
+    ranked = [x for _, x in sorted(zip(scores, scored_ids), key=lambda t: t[0], reverse=True)]
 
     # Remove duplicates and items the user already owns.
-    recs = _filter_unique(ranked, K, exclude_ids)
+    recs = _filter_unique(ranked, K, exclude_ids, allowed_items)
 
     # If FAISS produced too many duplicates, backfill with popular titles to
     # still return K unique recommendations.
     if len(recs) < K:
         popular = load_json(os.path.join(data_dir, 'global_popular_games.json'))
         exclude = owned_ids + [int(r['app_id']) if isinstance(r, dict) else int(r) for r in recs]
-        recs.extend(_filter_unique(popular, K - len(recs), exclude))
+        recs.extend(_filter_unique(popular, K - len(recs), exclude, allowed_items))
 
     return recs
