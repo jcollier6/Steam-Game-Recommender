@@ -24,7 +24,8 @@ def compute_user_meta_raw(
 
     * ``user_tag_profile`` – averaged tag vector for the user's owned games
     * ``recency`` – count of recently played or wishlisted games
-    * ``user_meta_raw`` – concatenation of the two above
+    * ``user_meta_raw`` – concatenation of the tag profile and a transformed
+      recency value (``log1p``)
     """
 
     if data_dir is None:
@@ -77,9 +78,10 @@ def compute_user_meta_raw(
         (interactions_df['user_id']==user_id) & (interactions_df['date_added_to_wishlist']>=recent_cut)
     ]
     recency = float(len(recent_play) + len(recent_wish))
+    recency_norm = np.log1p(recency)
 
     user_meta_raw = np.concatenate(
-        [user_tag_profile, np.array([recency], dtype=np.float32)], axis=0
+        [user_tag_profile, np.array([recency_norm], dtype=np.float32)], axis=0
     )
     return user_tag_profile, recency, user_meta_raw
 
