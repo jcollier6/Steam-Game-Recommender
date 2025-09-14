@@ -70,14 +70,24 @@ def train_model(
     all_items = [int(a) for a in app_id_to_index.keys()]
     global_popular = load_json(os.path.join(data_dir, "global_popular_games.json"))
 
+    def _app_idx(app_id: int) -> int:
+        idx = app_id_to_index.get(str(app_id))
+        return idx + 1 if idx is not None else 0
+
+    def _user_idx(uid: int) -> int:
+        idx = user_id_map.get(uid)
+        return idx + 1 if idx is not None else 0
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    tag_dim = load_numpy(os.path.join(data_dir, "tag_game_emb.npy")).shape[1]
+    first_uid = user_ids[0]
+    _, _, first_meta = compute_user_meta_raw(first_uid, interactions, data_dir)
+    user_meta_dim = first_meta.shape[0]
 
     tables = EmbeddingTables(len(user_ids), len(app_id_to_index))
     tables.user_emb = tables.user_emb.to(device)
     tables.item_emb = tables.item_emb.to(device)
-    user_meta_fc = UserMetaFC(tag_dim + 1).to(device)
+    user_meta_fc = UserMetaFC(user_meta_dim).to(device)
     score_mlp = ScoreMLP().to(device)
 
     params = list(tables.user_emb.parameters()) + list(tables.item_emb.parameters())
@@ -85,12 +95,17 @@ def train_model(
     optimizer = AdamW(params, lr=1e-4, weight_decay=1e-5)
     steps_per_epoch = ceil(len(user_ids) / batch_size)
 
-    item_meta_embs = torch.from_numpy(
-        load_numpy(os.path.join(data_dir, "item_meta_embs.npy"))
-    ).float().to(device)
+    item_meta_np = load_numpy(os.path.join(data_dir, "item_meta_embs.npy")).astype(
+        np.float32
+    )
+    item_meta_np = np.vstack([
+        np.zeros((1, item_meta_np.shape[1]), dtype=item_meta_np.dtype),
+        item_meta_np,
+    ])
+    item_meta_embs = torch.from_numpy(item_meta_np).float().to(device)
 
-    user_meta_list: List[np.ndarray] = []
-    for uid in user_ids:
+    user_meta_list: List[np.ndarray] = [np.zeros(user_meta_dim, dtype=np.float32), first_meta]
+    for uid in user_ids[1:]:
         _, _, meta_raw = compute_user_meta_raw(uid, interactions, data_dir)
         user_meta_list.append(meta_raw)
     user_meta_tensor = torch.tensor(
@@ -143,7 +158,7 @@ def train_model(
             )
             if pos_mask.sum() == 0 or pos_mask.sum() == len(val_df):
                 continue
-            u_idx = user_id_map[uid]
+            u_idx = _user_idx(uid)
             user_pos_all = set(
                 splits[uid]["train"]["app_id"].tolist()
                 + splits[uid]["val"]["app_id"].tolist()
@@ -159,7 +174,7 @@ def train_model(
                 labels: List[int] = []
                 for _, row in val_df.iterrows():
                     app = int(row["app_id"])
-                    idx = app_id_to_index.get(str(app), 0)
+                    idx = _app_idx(app)
                     item_emb = tables.item_emb(
                         torch.tensor([idx], dtype=torch.long, device=device)
                     )
@@ -196,7 +211,7 @@ def train_model(
                         continue
                     negatives = np.random.choice(neg_pool, 99, replace=False)
                     candidates = [pos_app] + list(negatives)
-                    idxs = [app_id_to_index.get(str(c), 0) for c in candidates]
+                    idxs = [_app_idx(c) for c in candidates]
                     idx_tensor = torch.tensor(idxs, dtype=torch.long, device=device)
                     item_embs = tables.item_emb(idx_tensor)
                     item_meta = item_meta_embs[idx_tensor]
@@ -260,7 +275,7 @@ def train_model(
             optimizer.zero_grad()
             losses = []
             for u, pos_list, neg_list in batch_pairs:
-                u_idx = user_id_map[u]
+                u_idx = _user_idx(u)
                 u_emb = tables.user_emb(
                     torch.tensor([u_idx], dtype=torch.long, device=device)
                 )
@@ -268,12 +283,12 @@ def train_model(
                 user_meta_emb = user_meta_fc(user_meta)
 
                 pos_idx = torch.tensor(
-                    [app_id_to_index.get(str(p), 0) for p in pos_list],
+                    [_app_idx(p) for p in pos_list],
                     dtype=torch.long,
                     device=device,
                 )
                 neg_idx = torch.tensor(
-                    [app_id_to_index.get(str(n), 0) for n in neg_list],
+                    [_app_idx(n) for n in neg_list],
                     dtype=torch.long,
                     device=device,
                 )

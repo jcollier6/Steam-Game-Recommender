@@ -53,19 +53,33 @@ def recommend(
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if data_dir is None:
         data_dir = os.getenv('ML_DATA_DIR', 'ml/data')
-    tag_dim = load_numpy(os.path.join(data_dir, 'tag_game_emb.npy')).shape[1]
-    user_meta_fc = UserMetaFC(tag_dim + 1).to(device)
+    umeta_state = load_torch(os.path.join(data_dir, 'user_meta_fc.pth'), device)
+    user_meta_dim = umeta_state['fc1.weight'].shape[1]
+    user_meta_fc = UserMetaFC(user_meta_dim).to(device)
+    user_meta_fc.load_state_dict(umeta_state)
     score_mlp = ScoreMLP().to(device)
-    user_meta_fc.load_state_dict(load_torch(os.path.join(data_dir, 'user_meta_fc.pth'), device))
     score_mlp.load_state_dict(load_torch(os.path.join(data_dir, 'score_mlp.pth'), device))
     tables = EmbeddingTables(0, 0)
     tables.load(os.path.join(data_dir, 'emb_tables'), device=device)
     map_path = os.path.join(data_dir, 'user_id_to_index.json')
     user_id_map = load_json(map_path) if os.path.exists(map_path) else {}
-    item_meta_embs = load_numpy(os.path.join(data_dir, 'item_meta_embs.npy'))
+    item_meta_np = load_numpy(os.path.join(data_dir, 'item_meta_embs.npy')).astype(np.float32)
+    item_meta_np = np.vstack([
+        np.zeros((1, item_meta_np.shape[1]), dtype=item_meta_np.dtype),
+        item_meta_np,
+    ])
+    item_meta_embs = item_meta_np
     index_meta = faiss.read_index(os.path.join(data_dir, 'faiss_meta.index'))
     index_to_app = load_json(os.path.join(data_dir, 'index_to_app_id_meta.json'))
     app_id_to_index = load_json(os.path.join(data_dir, 'app_id_to_meta_index.json'))
+
+    def _app_idx(app_id: int) -> int:
+        idx = app_id_to_index.get(str(app_id))
+        return idx + 1 if idx is not None else 0
+
+    def _user_idx(uid: int) -> int:
+        idx = user_id_map.get(str(uid))
+        return idx + 1 if idx is not None else 0
 
     user_df = interactions_df[interactions_df['user_id'] == user_id]
     if user_df.empty and user_library_df is not None:
@@ -142,34 +156,38 @@ def recommend(
 
     scores = []
     with torch.no_grad():
-        idx_u = user_id_map.get(str(user_id))
-        if idx_u is not None and idx_u < tables.user_emb.num_embeddings:
-            u_emb = tables.user_emb(torch.tensor([idx_u], device=device))
+        idx_u = _user_idx(user_id)
+        if idx_u != 0 and idx_u < tables.user_emb.num_embeddings:
+            u_emb = tables.user_emb(torch.tensor([idx_u], dtype=torch.long, device=device))
         else:
             pos_apps = user_df[
                 (user_df['playtime_forever'] > 0)
                 | (user_df['playtime_2weeks'] > 0)
                 | (user_df['wishlisted'])
             ]['app_id'].unique()
-            item_indices = [
-                app_id_to_index.get(str(a))
-                for a in pos_apps
-                if app_id_to_index.get(str(a)) is not None
-                and app_id_to_index.get(str(a)) < tables.item_emb.num_embeddings
-            ]
+            item_indices = []
+            for a in pos_apps:
+                idx = _app_idx(a)
+                if idx != 0 and idx < tables.item_emb.num_embeddings:
+                    item_indices.append(idx)
             if item_indices:
                 emb = tables.item_emb(torch.tensor(item_indices, device=device))
                 u_emb = emb.mean(dim=0, keepdim=True)
             else:
                 u_emb = tables.mean_user_emb.unsqueeze(0).to(device)
         for app_id in candidate_ids:
-            idx = app_id_to_index.get(str(app_id), None)
-            if idx is not None and idx < tables.item_emb.num_embeddings:
+            idx = _app_idx(app_id)
+            if idx != 0 and idx < tables.item_emb.num_embeddings:
                 i_emb = tables.item_emb(torch.tensor([idx], device=device))
             else:
                 i_emb = tables.mean_item_emb.unsqueeze(0).to(device)
-            if idx is not None and idx < len(item_meta_embs):
-                i_meta = torch.from_numpy(item_meta_embs[idx]).float().unsqueeze(0).to(device)
+            if idx != 0 and idx < len(item_meta_embs):
+                i_meta = (
+                    torch.from_numpy(item_meta_embs[idx])
+                    .float()
+                    .unsqueeze(0)
+                    .to(device)
+                )
             else:
                 i_meta = torch.zeros((1, item_meta_embs.shape[1]), device=device)
             feat = torch.cat([u_emb, user_meta_emb, i_emb, i_meta], dim=1)
