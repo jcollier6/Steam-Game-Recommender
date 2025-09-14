@@ -96,13 +96,19 @@ def train_model(
     item_meta_embs = torch.from_numpy(
         load_numpy(os.path.join(data_dir, "item_meta_embs.npy"))
     ).float().to(device)
+    # Prepend a zero vector so index 0 can represent missing items, aligning with
+    # the embedding tables where real items are offset by +1.
+    zero_row = torch.zeros((1, item_meta_embs.shape[1]), device=device)
+    item_meta_embs = torch.cat([zero_row, item_meta_embs], dim=0)
 
     user_meta_list: List[np.ndarray] = []
     for uid in user_ids:
         _, _, meta_raw = compute_user_meta_raw(uid, interactions, data_dir)
         user_meta_list.append(meta_raw)
+    user_meta_arr = np.vstack(user_meta_list)
+    pad_user = np.zeros((1, user_meta_arr.shape[1]), dtype=np.float32)
     user_meta_tensor = torch.tensor(
-        np.vstack(user_meta_list), dtype=torch.float32, device=device
+        np.vstack([pad_user, user_meta_arr]), dtype=torch.float32, device=device
     )
 
     # Configure epoch schedule: fixed or adaptive and scheduler total steps
@@ -152,7 +158,8 @@ def train_model(
             )
             if pos_mask.sum() == 0 or pos_mask.sum() == len(val_df):
                 continue
-            u_idx = user_id_map[uid]
+            u_idx = user_id_map.get(uid)
+            user_idx = 0 if u_idx is None else u_idx + 1
             user_pos_all = set(
                 splits[uid]["train"]["app_id"].tolist()
                 + splits[uid]["val"]["app_id"].tolist()
@@ -160,15 +167,16 @@ def train_model(
             )
             with torch.no_grad():
                 u_emb = tables.user_emb(
-                    torch.tensor([u_idx], dtype=torch.long, device=device)
+                    torch.tensor([user_idx], dtype=torch.long, device=device)
                 )
-                user_meta = user_meta_tensor[u_idx].unsqueeze(0)
+                user_meta = user_meta_tensor[user_idx].unsqueeze(0)
                 user_meta_emb = user_meta_fc(user_meta)
                 scores: List[float] = []
                 labels: List[int] = []
                 for _, row in val_df.iterrows():
                     app = int(row["app_id"])
-                    idx = app_id_to_index.get(str(app), 0)
+                    meta_idx = app_id_to_index.get(str(app))
+                    idx = 0 if meta_idx is None else meta_idx + 1
                     item_emb = tables.item_emb(
                         torch.tensor([idx], dtype=torch.long, device=device)
                     )
@@ -205,7 +213,10 @@ def train_model(
                         continue
                     negatives = np.random.choice(neg_pool, 99, replace=False)
                     candidates = [pos_app] + list(negatives)
-                    idxs = [app_id_to_index.get(str(c), 0) for c in candidates]
+                    idxs = []
+                    for c in candidates:
+                        m = app_id_to_index.get(str(c))
+                        idxs.append(0 if m is None else m + 1)
                     idx_tensor = torch.tensor(idxs, dtype=torch.long, device=device)
                     item_embs = tables.item_emb(idx_tensor)
                     item_meta = item_meta_embs[idx_tensor]
@@ -258,12 +269,15 @@ def train_model(
             optimizer.zero_grad()
             losses = []
             for u, pos, neg in batch_pairs:
-                u_idx = user_id_map[u]
-                pos_idx = app_id_to_index.get(str(pos), 0)
-                neg_idx = app_id_to_index.get(str(neg), 0)
+                u_idx = user_id_map.get(u)
+                u_lookup = 0 if u_idx is None else u_idx + 1
+                pos_m = app_id_to_index.get(str(pos))
+                neg_m = app_id_to_index.get(str(neg))
+                pos_idx = 0 if pos_m is None else pos_m + 1
+                neg_idx = 0 if neg_m is None else neg_m + 1
 
                 u_emb = tables.user_emb(
-                    torch.tensor([u_idx], dtype=torch.long, device=device)
+                    torch.tensor([u_lookup], dtype=torch.long, device=device)
                 )
                 pos_emb = tables.item_emb(
                     torch.tensor([pos_idx], dtype=torch.long, device=device)
@@ -272,7 +286,7 @@ def train_model(
                     torch.tensor([neg_idx], dtype=torch.long, device=device)
                 )
 
-                user_meta = user_meta_tensor[u_idx].unsqueeze(0)
+                user_meta = user_meta_tensor[u_lookup].unsqueeze(0)
                 user_meta_emb = user_meta_fc(user_meta)
 
                 pos_meta = item_meta_embs[pos_idx].unsqueeze(0)
