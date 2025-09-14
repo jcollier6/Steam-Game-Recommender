@@ -78,7 +78,7 @@ def train_model(
     tables.user_emb = tables.user_emb.to(device)
     tables.item_emb = tables.item_emb.to(device)
     user_meta_fc = UserMetaFC(tag_dim + 1).to(device)
-    score_mlp = ScoreMLP().to(device)
+    score_mlp = ScoreMLP(len(user_ids), len(app_id_to_index)).to(device)
 
     params = list(tables.user_emb.parameters()) + list(tables.item_emb.parameters())
     params += list(user_meta_fc.parameters()) + list(score_mlp.parameters())
@@ -157,6 +157,7 @@ def train_model(
                 user_meta_emb = user_meta_fc(user_meta)
                 scores: List[float] = []
                 labels: List[int] = []
+                u_idx_tensor = torch.tensor([u_idx], dtype=torch.long, device=device)
                 for _, row in val_df.iterrows():
                     app = int(row["app_id"])
                     idx = app_id_to_index.get(str(app), 0)
@@ -165,7 +166,8 @@ def train_model(
                     )
                     item_meta = item_meta_embs[idx].unsqueeze(0)
                     x = torch.cat([u_emb, user_meta_emb, item_emb, item_meta], dim=1)
-                    scores.append(score_mlp(x).item())
+                    item_idx_tensor = torch.tensor([idx], dtype=torch.long, device=device)
+                    scores.append(score_mlp(x, u_idx_tensor, item_idx_tensor).item())
                     label = int(
                         (row["playtime_forever"] > 0)
                         or (row["playtime_2weeks"] > 0)
@@ -203,7 +205,8 @@ def train_model(
                     u_rep = u_emb.repeat(len(candidates), 1)
                     um_rep = user_meta_emb.repeat(len(candidates), 1)
                     x = torch.cat([u_rep, um_rep, item_embs, item_meta], dim=1)
-                    cand_scores = score_mlp(x).view(-1).cpu().numpy()
+                    u_batch = torch.full((len(candidates),), u_idx, dtype=torch.long, device=device)
+                    cand_scores = score_mlp(x, u_batch, idx_tensor).view(-1).cpu().numpy()
                     cand_labels = np.zeros(len(candidates), dtype=int)
                     cand_labels[0] = 1
                     ranking = np.argsort(-cand_scores)
@@ -289,8 +292,9 @@ def train_model(
 
                 x_pos = torch.cat([u_rep, um_rep, pos_emb, pos_meta], dim=1)
                 x_neg = torch.cat([u_rep, um_rep, neg_emb, neg_meta], dim=1)
-                s_pos = score_mlp(x_pos)
-                s_neg = score_mlp(x_neg)
+                u_batch = torch.full((len(pos_list),), u_idx, dtype=torch.long, device=device)
+                s_pos = score_mlp(x_pos, u_batch, pos_idx)
+                s_neg = score_mlp(x_neg, u_batch, neg_idx)
 
                 diff = torch.clamp(s_pos - s_neg, -30.0, 30.0)
                 loss = -torch.log(torch.sigmoid(diff)).mean()
