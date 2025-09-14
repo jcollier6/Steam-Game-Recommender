@@ -6,6 +6,7 @@ from typing import Dict, List, Set, Tuple
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.nn.utils import clip_grad_norm_
 from transformers import get_cosine_schedule_with_warmup
@@ -52,11 +53,14 @@ def train_model(
     num_epochs: int | None = None,
     batch_size: int = 256,
     data_dir: str | None = None,
+    margin: float = 1.0,
 ) -> None:
     """Train embedding models with pairwise ranking.
 
     The function precomputes item and user metadata, supports optional
     adaptive early stopping and runs on CPU or GPU depending on availability.
+    A softplus loss with an explicit margin encourages positive scores to
+    exceed negative scores by ``margin``.
     """
 
     if data_dir is None:
@@ -311,8 +315,8 @@ def train_model(
                 s_pos = score_mlp(x_pos, u_batch, pos_idx)
                 s_neg = score_mlp(x_neg, u_batch, neg_idx)
 
-                diff = torch.clamp(s_pos - s_neg, -30.0, 30.0)
-                loss = -torch.log(torch.sigmoid(diff)).mean()
+                diff = s_pos - s_neg
+                loss = F.softplus(margin - diff).mean()
                 losses.append(loss)
             if not losses:
                 continue

@@ -41,6 +41,12 @@ def main():
         help="override NUM_EPOCHS env for chunk10 training",
     )
     parser.add_argument(
+        "--margin",
+        type=float,
+        default=None,
+        help="override margin for chunk10 pairwise loss",
+    )
+    parser.add_argument(
         "--svd_dim",
         type=int,
         default=None,
@@ -62,6 +68,11 @@ def main():
     epochs = int(epochs_env) if epochs_env else None
     if args.epochs is not None:
         epochs = max(1, int(args.epochs))
+
+    margin_env = os.getenv("MARGIN")
+    margin = float(margin_env) if margin_env else 1.0
+    if args.margin is not None:
+        margin = float(args.margin)
 
     games_df_cache = {}
 
@@ -87,7 +98,7 @@ def main():
         ("chunk4", lambda: chunk4_text_embeddings.run_text_embeddings(load_games_df())),
         ("chunk5", chunk5_item_meta.run_item_meta_embedding),
         ("chunk6", chunk6_faiss.build_faiss_indices),
-        ("chunk10", lambda: chunk10_train.train_model(num_epochs=epochs)),
+        ("chunk10", lambda: chunk10_train.train_model(num_epochs=epochs, margin=margin)),
     ]
 
     # Determine which chunk(s) to run
