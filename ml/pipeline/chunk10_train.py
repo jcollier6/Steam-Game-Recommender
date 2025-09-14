@@ -1,7 +1,7 @@
 """Simplified pairwise ranking training loop."""
 import os
 from math import ceil
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -40,17 +40,12 @@ def _split_by_user(df: pd.DataFrame) -> Dict[int, Dict[str, pd.DataFrame]]:
     return splits
 
 
-def _sample_positive(train_df: pd.DataFrame) -> int:
-    pos_df = train_df[(train_df["playtime_forever"] > 0) | (train_df["playtime_2weeks"] > 0) | (train_df["wishlisted"])]
-    row = pos_df.sample(1).iloc[0]
-    return int(row["app_id"])
-
-
-def _sample_negative(user_pos: List[int], global_popular: List[int]) -> int:
-    candidates = [a for a in global_popular if a not in user_pos]
-    if not candidates:
-        return int(np.random.choice(global_popular))
-    return int(np.random.choice(candidates))
+def _sample_negative(user_pos: Set[int], all_items: List[int]) -> int:
+    """Sample a negative item that the user has not interacted with."""
+    while True:
+        neg = int(np.random.choice(all_items))
+        if neg not in user_pos:
+            return neg
 
 
 def train_model(
@@ -73,6 +68,7 @@ def train_model(
     user_id_map = build_id_to_index_map(user_ids)
     save_json(user_id_map, os.path.join(data_dir, "user_id_to_index.json"))
     app_id_to_index = load_json(os.path.join(data_dir, "app_id_to_meta_index.json"))
+    all_items = [int(a) for a in app_id_to_index.keys()]
     global_popular = load_json(os.path.join(data_dir, "global_popular_games.json"))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -140,7 +136,6 @@ def train_model(
         hits = 0
         ndcg_sum = 0.0
         total_pos = 0
-        all_items = [int(k) for k in app_id_to_index.keys()]
         for uid in user_ids:
             val_df = splits[uid]["val"]
             if val_df.empty:
@@ -247,44 +242,64 @@ def train_model(
         epoch_loss = 0.0
         for i in range(0, len(user_ids), batch_size):
             batch_u = user_ids[i : i + batch_size]
-            batch_pairs: List[Tuple[int, int, int]] = []
+            batch_pairs: List[Tuple[int, List[int], List[int]]] = []
             for u in batch_u:
                 train_df = splits[u]["train"]
-                pos = _sample_positive(train_df)
+                pos_df = train_df[
+                    (train_df["playtime_forever"] > 0)
+                    | (train_df["playtime_2weeks"] > 0)
+                    | (train_df["wishlisted"])
+                ]
+                pos_list = pos_df["app_id"].tolist()
+                if not pos_list:
+                    continue
                 user_pos_list = train_df["app_id"].tolist()
-                neg = _sample_negative(user_pos_list, global_popular)
-                batch_pairs.append((u, pos, neg))
+                user_pos_set = set(user_pos_list)
+                neg_list = [
+                    _sample_negative(user_pos_set, all_items)
+                    for _ in pos_list
+                ]
+                batch_pairs.append((u, pos_list, neg_list))
 
             optimizer.zero_grad()
             losses = []
-            for u, pos, neg in batch_pairs:
+            for u, pos_list, neg_list in batch_pairs:
                 u_idx = user_id_map[u]
-                pos_idx = app_id_to_index.get(str(pos), 0)
-                neg_idx = app_id_to_index.get(str(neg), 0)
-
                 u_emb = tables.user_emb(
                     torch.tensor([u_idx], dtype=torch.long, device=device)
                 )
-                pos_emb = tables.item_emb(
-                    torch.tensor([pos_idx], dtype=torch.long, device=device)
-                )
-                neg_emb = tables.item_emb(
-                    torch.tensor([neg_idx], dtype=torch.long, device=device)
-                )
-
                 user_meta = user_meta_tensor[u_idx].unsqueeze(0)
                 user_meta_emb = user_meta_fc(user_meta)
 
-                pos_meta = item_meta_embs[pos_idx].unsqueeze(0)
-                neg_meta = item_meta_embs[neg_idx].unsqueeze(0)
+                pos_idx = torch.tensor(
+                    [app_id_to_index.get(str(p), 0) for p in pos_list],
+                    dtype=torch.long,
+                    device=device,
+                )
+                neg_idx = torch.tensor(
+                    [app_id_to_index.get(str(n), 0) for n in neg_list],
+                    dtype=torch.long,
+                    device=device,
+                )
 
-                x_pos = torch.cat([u_emb, user_meta_emb, pos_emb, pos_meta], dim=1)
-                x_neg = torch.cat([u_emb, user_meta_emb, neg_emb, neg_meta], dim=1)
+                pos_emb = tables.item_emb(pos_idx)
+                neg_emb = tables.item_emb(neg_idx)
+
+                pos_meta = item_meta_embs[pos_idx]
+                neg_meta = item_meta_embs[neg_idx]
+
+                u_rep = u_emb.repeat(len(pos_list), 1)
+                um_rep = user_meta_emb.repeat(len(pos_list), 1)
+
+                x_pos = torch.cat([u_rep, um_rep, pos_emb, pos_meta], dim=1)
+                x_neg = torch.cat([u_rep, um_rep, neg_emb, neg_meta], dim=1)
                 s_pos = score_model(x_pos)
                 s_neg = score_model(x_neg)
                 diff = torch.clamp(s_pos - s_neg, -30.0, 30.0)
-                loss = -torch.log(torch.sigmoid(diff))
+                loss = -torch.log(torch.sigmoid(diff)).mean()
                 losses.append(loss)
+            if not losses:
+                continue
             loss_batch = torch.stack(losses).mean()
             loss_batch.backward()
             clip_grad_norm_(params, max_norm=5.0)
