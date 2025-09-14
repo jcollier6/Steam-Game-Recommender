@@ -11,7 +11,7 @@ from torch.nn.utils import clip_grad_norm_
 from transformers import get_cosine_schedule_with_warmup
 
 from .chunk8_embeddings import EmbeddingTables
-from .chunk9_model import UserMetaFC, ScoreMLP, ScoreBilinear
+from .chunk9_model import UserMetaFC, ScoreMLP
 from .chunk7_user_profile import compute_user_meta_raw
 from .utils import (
     load_numpy,
@@ -57,7 +57,6 @@ def train_model(
     num_epochs: int | None = None,
     batch_size: int = 256,
     data_dir: str | None = None,
-    scorer: str = "mlp",
 ) -> None:
     """Train embedding models with pairwise ranking.
 
@@ -83,13 +82,10 @@ def train_model(
     tables.user_emb = tables.user_emb.to(device)
     tables.item_emb = tables.item_emb.to(device)
     user_meta_fc = UserMetaFC(tag_dim + 1).to(device)
-    if scorer == "bilinear":
-        score_model = ScoreBilinear().to(device)
-    else:
-        score_model = ScoreMLP().to(device)
+    score_mlp = ScoreMLP().to(device)
 
     params = list(tables.user_emb.parameters()) + list(tables.item_emb.parameters())
-    params += list(user_meta_fc.parameters()) + list(score_model.parameters())
+    params += list(user_meta_fc.parameters()) + list(score_mlp.parameters())
     optimizer = AdamW(params, lr=1e-4, weight_decay=1e-5)
     steps_per_epoch = ceil(len(user_ids) / batch_size)
 
@@ -174,7 +170,7 @@ def train_model(
                     )
                     item_meta = item_meta_embs[idx].unsqueeze(0)
                     x = torch.cat([u_emb, user_meta_emb, item_emb, item_meta], dim=1)
-                    scores.append(score_model(x).item())
+                    scores.append(score_mlp(x).item())
                     label = int(
                         (row["playtime_forever"] > 0)
                         or (row["playtime_2weeks"] > 0)
@@ -212,7 +208,7 @@ def train_model(
                     u_rep = u_emb.repeat(len(candidates), 1)
                     um_rep = user_meta_emb.repeat(len(candidates), 1)
                     x = torch.cat([u_rep, um_rep, item_embs, item_meta], dim=1)
-                    cand_scores = score_model(x).view(-1).cpu().numpy()
+                    cand_scores = score_mlp(x).view(-1).cpu().numpy()
                     cand_labels = np.zeros(len(candidates), dtype=int)
                     cand_labels[0] = 1
                     ranking = np.argsort(-cand_scores)
@@ -280,8 +276,8 @@ def train_model(
 
                 x_pos = torch.cat([u_emb, user_meta_emb, pos_emb, pos_meta], dim=1)
                 x_neg = torch.cat([u_emb, user_meta_emb, neg_emb, neg_meta], dim=1)
-                s_pos = score_model(x_pos)
-                s_neg = score_model(x_neg)
+                s_pos = score_mlp(x_pos)
+                s_neg = score_mlp(x_neg)
                 diff = torch.clamp(s_pos - s_neg, -30.0, 30.0)
                 loss = -torch.log(torch.sigmoid(diff))
                 losses.append(loss)
@@ -330,22 +326,4 @@ def train_model(
     tables.compute_means()
     tables.save(os.path.join(data_dir, "emb_tables"))
     save_checkpoint(user_meta_fc.state_dict(), os.path.join(data_dir, "user_meta_fc.pth"))
-    fname = "score_bilinear.pth" if scorer == "bilinear" else "score_mlp.pth"
-    save_checkpoint(score_model.state_dict(), os.path.join(data_dir, fname))
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Train ranking model")
-    parser.add_argument("--scorer", choices=["mlp", "bilinear"], default="mlp")
-    parser.add_argument("--epochs", type=int, default=None)
-    parser.add_argument("--batch_size", type=int, default=256)
-    parser.add_argument("--data_dir", type=str, default=None)
-    args = parser.parse_args()
-    train_model(
-        num_epochs=args.epochs,
-        batch_size=args.batch_size,
-        data_dir=args.data_dir,
-        scorer=args.scorer,
-    )
+    save_checkpoint(score_mlp.state_dict(), os.path.join(data_dir, "score_mlp.pth"))
