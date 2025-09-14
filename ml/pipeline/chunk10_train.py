@@ -110,9 +110,9 @@ def train_model(
             return default
 
     adaptive = num_epochs is None
-    min_epochs = _env_int("MIN_EPOCHS", 5)
-    max_epochs = _env_int("MAX_EPOCHS", 20)
-    patience = _env_int("PATIENCE_EPOCHS", 2)
+    min_epochs = _env_int("MIN_EPOCHS", 10)
+    max_epochs = _env_int("MAX_EPOCHS", 50)
+    patience = _env_int("PATIENCE_EPOCHS", 3)
     rel_improve = _env_float("REL_IMPROVE", 0.005)  # 0.5% relative improvement
 
     # Initialize scheduler with a safe upper bound on total steps
@@ -289,8 +289,8 @@ def train_model(
 
                 x_pos = torch.cat([u_rep, um_rep, pos_emb, pos_meta], dim=1)
                 x_neg = torch.cat([u_rep, um_rep, neg_emb, neg_meta], dim=1)
-                s_pos = score_model(x_pos)
-                s_neg = score_model(x_neg)
+                s_pos = score_mlp(x_pos)
+                s_neg = score_mlp(x_neg)
 
                 diff = torch.clamp(s_pos - s_neg, -30.0, 30.0)
                 loss = -torch.log(torch.sigmoid(diff)).mean()
