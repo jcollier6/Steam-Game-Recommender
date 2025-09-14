@@ -81,6 +81,12 @@ def recommend(
         idx = user_id_map.get(str(uid))
         return idx + 1 if idx is not None else 0
 
+    allowed_items = {
+        int(app): idx + 1
+        for app, idx in app_id_to_index.items()
+        if (idx + 1) < tables.item_emb.num_embeddings and (idx + 1) < len(item_meta_embs)
+    }
+
     user_df = interactions_df[interactions_df['user_id'] == user_id]
     if user_df.empty and user_library_df is not None:
         lib = user_library_df.copy()
@@ -144,7 +150,8 @@ def recommend(
         new_batch = []
         for idx in cand_idxs[0][start:search_k]:
             app_id = index_to_app[idx] if isinstance(index_to_app, list) else index_to_app[str(idx)]
-            if app_id in seen_cands:
+            app_id = int(app_id)
+            if app_id in seen_cands or app_id not in allowed_items:
                 continue
             seen_cands.add(app_id)
             candidate_ids.append(app_id)
@@ -176,20 +183,11 @@ def recommend(
             else:
                 u_emb = tables.mean_user_emb.unsqueeze(0).to(device)
         for app_id in candidate_ids:
-            idx = _app_idx(app_id)
-            if idx != 0 and idx < tables.item_emb.num_embeddings:
-                i_emb = tables.item_emb(torch.tensor([idx], device=device))
-            else:
-                i_emb = tables.mean_item_emb.unsqueeze(0).to(device)
-            if idx != 0 and idx < len(item_meta_embs):
-                i_meta = (
-                    torch.from_numpy(item_meta_embs[idx])
-                    .float()
-                    .unsqueeze(0)
-                    .to(device)
-                )
-            else:
-                i_meta = torch.zeros((1, item_meta_embs.shape[1]), device=device)
+            idx = allowed_items[app_id]
+            i_emb = tables.item_emb(torch.tensor([idx], device=device))
+            i_meta = (
+                torch.from_numpy(item_meta_embs[idx]).float().unsqueeze(0).to(device)
+            )
             feat = torch.cat([u_emb, user_meta_emb, i_emb, i_meta], dim=1)
             s = score_mlp(feat)
             scores.append(s.item())
