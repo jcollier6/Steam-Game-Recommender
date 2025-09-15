@@ -70,6 +70,11 @@ def compute_user_meta_raw(
     else:
         user_tag_profile = global_tag_mean.astype(np.float32).copy()
 
+    norm = float(np.linalg.norm(user_tag_profile))
+    if norm == 0:
+        norm = 1e-8
+    user_tag_profile = (user_tag_profile / norm).astype(np.float32)
+
     recent_cut = now - timedelta(days=30)
     recent_play = interactions_df[
         (interactions_df['user_id']==user_id) & (interactions_df['playtime_2weeks']>0)
