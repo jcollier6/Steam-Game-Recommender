@@ -1,5 +1,6 @@
 """Simplified pairwise ranking training loop."""
 import os
+import copy
 from math import ceil
 from typing import Dict, List, Set, Tuple
 
@@ -134,10 +135,11 @@ def train_model(
             return default
 
     adaptive = num_epochs is None
-    min_epochs = _env_int("MIN_EPOCHS", 10)
-    max_epochs = _env_int("MAX_EPOCHS", 50)
-    patience = _env_int("PATIENCE_EPOCHS", 3)
-    rel_improve = _env_float("REL_IMPROVE", 0.005)  # 0.5% relative improvement
+    # Defaults tuned for large-scale training (87k games, hundreds of users)
+    min_epochs = _env_int("MIN_EPOCHS", 20)
+    max_epochs = _env_int("MAX_EPOCHS", 100)
+    patience = _env_int("PATIENCE_EPOCHS", 5)
+    rel_improve = _env_float("REL_IMPROVE", 0.001)  # 0.1% relative improvement
 
     # Initialize scheduler with a safe upper bound on total steps
     if num_epochs is None:
@@ -151,6 +153,8 @@ def train_model(
     )
 
     neg_per_pos = 5
+
+    val_metric = "hit10"
 
     def validate() -> Tuple[float, float, float]:
         pair_correct = 0
@@ -262,8 +266,10 @@ def train_model(
         )
     else:
         print(f"Training for {num_epochs} epoch(s)", flush=True)
+    print(f"Tracking validation metric '{val_metric}' for early stopping", flush=True)
 
-    best_loss = float("inf")
+    best_metric = float('-inf')
+    best_state = None
     no_improve = 0
     epoch = 0
     while True:
@@ -374,12 +380,21 @@ def train_model(
             flush=True
         )
 
-        # Early stopping logic
-        if best_loss == float("inf") or (
-            (best_loss - avg_loss) > rel_improve * max(best_loss, 1e-8)
+        curr_metric = hit10
+        if np.isnan(curr_metric):
+            curr_metric = float('-inf')
+        # Early stopping logic based on validation metric
+        if best_metric == float('-inf') or (
+            (curr_metric - best_metric) > rel_improve * max(best_metric, 1e-8)
         ):
-            best_loss = avg_loss
+            best_metric = curr_metric
             no_improve = 0
+            best_state = {
+                'user_emb': copy.deepcopy(tables.user_emb.state_dict()),
+                'item_emb': copy.deepcopy(tables.item_emb.state_dict()),
+                'user_meta_fc': copy.deepcopy(user_meta_fc.state_dict()),
+                'score_mlp': copy.deepcopy(score_mlp.state_dict()),
+            }
         else:
             no_improve += 1
 
@@ -399,6 +414,12 @@ def train_model(
             if epoch >= max_epochs:
                 print(f"Reached max_epochs={max_epochs}", flush=True)
                 break
+
+    if best_state is not None:
+        tables.user_emb.load_state_dict(best_state['user_emb'])
+        tables.item_emb.load_state_dict(best_state['item_emb'])
+        user_meta_fc.load_state_dict(best_state['user_meta_fc'])
+        score_mlp.load_state_dict(best_state['score_mlp'])
 
     tables.compute_means()
     tables.save(os.path.join(data_dir, "emb_tables"))
