@@ -41,12 +41,21 @@ def _split_by_user(df: pd.DataFrame) -> Dict[int, Dict[str, pd.DataFrame]]:
     return splits
 
 
-def _sample_negative(user_pos: Set[int], all_items: List[int]) -> int:
-    """Sample a negative item outside the user's known positives (train/val/test)."""
-    while True:
-        neg = int(np.random.choice(all_items))
-        if neg not in user_pos:
-            return neg
+def _sample_negatives(
+    user_pos: Set[int],
+    all_items: List[int],
+    k: int,
+) -> List[int]:
+    """Sample ``k`` negative items outside the user's known positives.
+
+    Sampling is uniform over ``all_items`` with replacement when the available
+    pool is smaller than ``k``.
+    """
+
+    pool = [a for a in all_items if a not in user_pos]
+    if len(pool) < k:
+        return list(np.random.choice(pool, k, replace=True))
+    return list(np.random.choice(pool, k, replace=False))
 
 
 def train_model(
@@ -140,6 +149,8 @@ def train_model(
         steps_per_epoch,  # warmup for roughly 1 epoch
         total_steps,
     )
+
+    neg_per_pos = 5
 
     def validate() -> Tuple[float, float, float]:
         pair_correct = 0
@@ -260,7 +271,7 @@ def train_model(
         epoch_loss = 0.0
         for i in range(0, len(user_ids), batch_size):
             batch_u = user_ids[i : i + batch_size]
-            batch_pairs: List[Tuple[int, List[int], List[int]]] = []
+            batch_pairs: List[Tuple[int, List[int], List[List[int]]]] = []
             for u in batch_u:
                 train_df = splits[u]["train"]
                 pos_df = train_df[
@@ -276,16 +287,18 @@ def train_model(
                     + splits[u]["val"]["app_id"].tolist()
                     + splits[u]["test"]["app_id"].tolist()
                 )
-                # Sample negatives excluding all known positives across splits
-                neg_list = [
-                    _sample_negative(user_pos_set, all_items)
+                # Sample multiple negatives excluding all known positives across splits
+                neg_lists = [
+                    _sample_negatives(
+                        user_pos_set, all_items, neg_per_pos
+                    )
                     for _ in pos_list
                 ]
-                batch_pairs.append((u, pos_list, neg_list))
+                batch_pairs.append((u, pos_list, neg_lists))
 
             optimizer.zero_grad()
             losses = []
-            for u, pos_list, neg_list in batch_pairs:
+            for u, pos_list, neg_lists in batch_pairs:
                 u_idx = user_id_map[u]
                 u_emb = tables.user_emb(
                     torch.tensor([u_idx], dtype=torch.long, device=device)
@@ -298,28 +311,49 @@ def train_model(
                     meta_idx = app_id_to_index.get(str(p))
                     pos_indices.append(meta_idx + 1 if meta_idx is not None else 0)
                 pos_idx = torch.tensor(pos_indices, dtype=torch.long, device=device)
-                neg_indices = []
-                for n in neg_list:
-                    meta_idx = app_id_to_index.get(str(n))
-                    neg_indices.append(meta_idx + 1 if meta_idx is not None else 0)
+                neg_indices: List[List[int]] = []
+                for negs in neg_lists:
+                    row: List[int] = []
+                    for n in negs:
+                        meta_idx = app_id_to_index.get(str(n))
+                        row.append(meta_idx + 1 if meta_idx is not None else 0)
+                    neg_indices.append(row)
                 neg_idx = torch.tensor(neg_indices, dtype=torch.long, device=device)
 
                 pos_emb = tables.item_emb(pos_idx)
-                neg_emb = tables.item_emb(neg_idx)
+                neg_emb = tables.item_emb(neg_idx.view(-1)).view(len(pos_list), neg_per_pos, -1)
 
                 pos_meta = item_meta_embs[pos_idx]
-                neg_meta = item_meta_embs[neg_idx]
+                neg_meta = item_meta_embs[neg_idx.view(-1)].view(len(pos_list), neg_per_pos, -1)
 
                 u_rep = u_emb.repeat(len(pos_list), 1)
                 um_rep = user_meta_emb.repeat(len(pos_list), 1)
 
                 x_pos = torch.cat([u_rep, um_rep, pos_emb, pos_meta], dim=1)
-                x_neg = torch.cat([u_rep, um_rep, neg_emb, neg_meta], dim=1)
-                u_batch = torch.full((len(pos_list),), u_idx, dtype=torch.long, device=device)
-                s_pos = score_mlp(x_pos, u_batch, pos_idx)
-                s_neg = score_mlp(x_neg, u_batch, neg_idx)
 
-                diff = s_pos - s_neg
+                u_rep_neg = u_emb.repeat(len(pos_list) * neg_per_pos, 1)
+                um_rep_neg = user_meta_emb.repeat(len(pos_list) * neg_per_pos, 1)
+                x_neg = torch.cat(
+                    [
+                        u_rep_neg,
+                        um_rep_neg,
+                        neg_emb.view(len(pos_list) * neg_per_pos, -1),
+                        neg_meta.view(len(pos_list) * neg_per_pos, -1),
+                    ],
+                    dim=1,
+                )
+
+                u_batch_pos = torch.full((len(pos_list),), u_idx, dtype=torch.long, device=device)
+                u_batch_neg = torch.full(
+                    (len(pos_list) * neg_per_pos,), u_idx, dtype=torch.long, device=device
+                )
+
+                s_pos = score_mlp(x_pos, u_batch_pos, pos_idx)
+                s_neg = score_mlp(x_neg, u_batch_neg, neg_idx.view(-1)).view(
+                    len(pos_list), neg_per_pos
+                )
+
+                diff = s_pos.unsqueeze(1) - s_neg
                 loss = F.softplus(margin - diff).mean()
                 losses.append(loss)
             if not losses:
