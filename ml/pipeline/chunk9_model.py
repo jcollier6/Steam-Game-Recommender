@@ -36,7 +36,16 @@ class ScoreMLP(nn.Module):
         self.bn3 = nn.LayerNorm(256)
         self.fc4 = nn.Linear(256, 1)
 
-    def forward(self, x, user_idx: torch.LongTensor | None = None, item_idx: torch.LongTensor | None = None):
+    def forward(
+        self,
+        x,
+        user_emb: torch.Tensor,
+        item_emb: torch.Tensor,
+        user_idx: torch.LongTensor | None = None,
+        item_idx: torch.LongTensor | None = None,
+    ):
+        dp = (user_emb * item_emb).sum(dim=1, keepdim=True)
+
         h = self.fc1(x)
         h = self.bn1(h)
         h = F.relu(h)
@@ -54,6 +63,7 @@ class ScoreMLP(nn.Module):
         h = F.relu(h)
         h = F.dropout(h, p=0.3, training=self.training)
         out = self.fc4(h)
+        out = out + dp
 
         if user_idx is not None:
             out = out + self.user_bias(user_idx)

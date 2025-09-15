@@ -198,7 +198,7 @@ def train_model(
                     item_meta = item_meta_embs[idx].unsqueeze(0)
                     x = torch.cat([u_emb, user_meta_emb, item_emb, item_meta], dim=1)
                     item_idx_tensor = torch.tensor([idx], dtype=torch.long, device=device)
-                    scores.append(score_mlp(x, u_idx_tensor, item_idx_tensor).item())
+                    scores.append(score_mlp(x, u_emb, item_emb, u_idx_tensor, item_idx_tensor).item())
                     label = int(
                         (row["playtime_forever"] > 0)
                         or (row["playtime_2weeks"] > 0)
@@ -240,7 +240,7 @@ def train_model(
                     um_rep = user_meta_emb.repeat(len(candidates), 1)
                     x = torch.cat([u_rep, um_rep, item_embs, item_meta], dim=1)
                     u_batch = torch.full((len(candidates),), u_idx, dtype=torch.long, device=device)
-                    cand_scores = score_mlp(x, u_batch, idx_tensor).view(-1).cpu().numpy()
+                    cand_scores = score_mlp(x, u_rep, item_embs, u_batch, idx_tensor).view(-1).cpu().numpy()
                     cand_labels = np.zeros(len(candidates), dtype=int)
                     cand_labels[0] = 1
                     ranking = np.argsort(-cand_scores)
@@ -354,10 +354,14 @@ def train_model(
                     (len(pos_list) * neg_per_pos,), u_idx, dtype=torch.long, device=device
                 )
 
-                s_pos = score_mlp(x_pos, u_batch_pos, pos_idx)
-                s_neg = score_mlp(x_neg, u_batch_neg, neg_idx.view(-1)).view(
-                    len(pos_list), neg_per_pos
-                )
+                s_pos = score_mlp(x_pos, u_rep, pos_emb, u_batch_pos, pos_idx)
+                s_neg = score_mlp(
+                    x_neg,
+                    u_rep_neg,
+                    neg_emb.view(len(pos_list) * neg_per_pos, -1),
+                    u_batch_neg,
+                    neg_idx.view(-1),
+                ).view(len(pos_list), neg_per_pos)
 
                 diff = s_pos.unsqueeze(1) - s_neg
                 loss = F.softplus(margin - diff).mean()

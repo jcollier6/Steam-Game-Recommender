@@ -187,7 +187,7 @@ def recommend(
             item_idx_tensor = torch.tensor([idx], dtype=torch.long, device=device)
             i_meta = torch.from_numpy(item_meta_embs[idx]).float().unsqueeze(0).to(device)
             feat = torch.cat([u_emb, user_meta_emb, i_emb, i_meta], dim=1)
-            s = score_mlp(feat, u_idx_tensor, item_idx_tensor)
+            s = score_mlp(feat, u_emb, i_emb, u_idx_tensor, item_idx_tensor)
             scores.append(s.item())
             scored_ids.append(app_id)
 
