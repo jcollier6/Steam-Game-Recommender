@@ -1,0 +1,11 @@
+# Exclude large or generated artifacts from the build context
+models/
+data/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints
+.env
+.DS_Store
+*.log
