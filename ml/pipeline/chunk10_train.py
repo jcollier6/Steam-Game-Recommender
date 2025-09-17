@@ -49,14 +49,33 @@ def _sample_negatives(
 ) -> List[int]:
     """Sample ``k`` negative items outside the user's known positives.
 
-    Sampling is uniform over ``all_items`` with replacement when the available
-    pool is smaller than ``k``.
+    Uses rejection sampling to avoid repeatedly rebuilding filtered pools.
+    Falls back to sampling with replacement when the available negatives are
+    fewer than ``k``.
     """
 
-    pool = [a for a in all_items if a not in user_pos]
-    if len(pool) < k:
-        return list(np.random.choice(pool, k, replace=True))
-    return list(np.random.choice(pool, k, replace=False))
+    if not all_items:
+        return []
+
+    available = len(all_items) - len(user_pos)
+    if available <= 0:
+        return []
+
+    with_replacement = available < k
+    negatives: List[int] = []
+    used: Set[int] = set()
+
+    while len(negatives) < k:
+        candidate = all_items[np.random.randint(0, len(all_items))]
+        if candidate in user_pos:
+            continue
+        if not with_replacement and candidate in used:
+            continue
+        negatives.append(candidate)
+        if not with_replacement:
+            used.add(candidate)
+
+    return negatives
 
 
 def train_model(
