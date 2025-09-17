@@ -96,6 +96,7 @@ services:
       - dev     # <--- only spin this up for dev
 
   ml-extract:
+    image: steam-game-recommender-ml
     build:
       context: ./ml
       dockerfile: Dockerfile
@@ -106,6 +107,7 @@ services:
       - backend-network
     volumes:
       - ./:/app
+      - hf-cache:/root/.cache/huggingface
     gpus: all
     profiles: ["extract"]
     command: >
@@ -116,6 +118,7 @@ services:
       "
 
   ml-train:
+    image: steam-game-recommender-ml
     build:
       context: ./ml
       dockerfile: Dockerfile
@@ -128,12 +131,14 @@ services:
       - backend-network
     volumes:
       - ./:/app
+      - hf-cache:/root/.cache/huggingface
     gpus: all
     profiles: ["train"]
     working_dir: /app
     command: python -m ml.pipeline.train_pipeline ${RUN_CHUNK:+--chunk $RUN_CHUNK} --start ${START_CHUNK:-1}
       
   recommender:
+    image: steam-game-recommender-ml
     build:
       context: ./ml
       dockerfile: Dockerfile
@@ -144,6 +149,7 @@ services:
       - API_KEY=${API_KEY}
     volumes:
       - .:/app
+      - hf-cache:/root/.cache/huggingface
     gpus: all
     ports:
       - "8001:8001"
@@ -163,6 +169,7 @@ services:
 
 volumes:
   frontend_node_modules:
+  hf-cache:
   
 networks:
   backend-network:
